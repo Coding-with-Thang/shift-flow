@@ -1,0 +1,172 @@
+// Multi-tenant shift swap (BPO). Single shared DB with tenantId on every row.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  AGENT
+  LEADER
+  OPS_MANAGER
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum TicketStatus {
+  PENDING
+  CLAIMED
+  APPROVED
+  DECLINED
+  CANCELLED
+  EXPIRED
+}
+
+/// Distinct actions for compliance / reporting
+enum AuditAction {
+  TICKET_CREATED
+  TICKET_CLAIMED
+  TICKET_APPROVED
+  TICKET_DECLINED
+  TICKET_CANCELLED
+  TICKET_EXPIRED
+  USER_CREATED
+  INVITE_ISSUED
+  LOGIN_SUCCESS
+  LOGOUT
+}
+
+model Tenant {
+  id         String   @id @default(cuid())
+  name       String
+  /// Short code used at login (e.g. acme)
+  tenantCode String   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  users         User[]
+  shiftTickets  ShiftTicket[]
+  inviteCodes   InviteCode[]
+  auditEvents   AuditEvent[]
+  dailyMetrics  AnalyticsDaily[]
+}
+
+model User {
+  id           String     @id @default(cuid())
+  tenantId     String
+  tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  /// Login name; unique per tenant
+  username     String
+  passwordHash String
+  role         Role
+  /// Shown to other agents (aliases-only peer view)
+  publicAlias  String
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  inviteCodes       InviteCode[]
+  ticketsPosted     ShiftTicket[] @relation("Requestor")
+  ticketsClaimed    ShiftTicket[] @relation("Claimer")
+  ticketsDecided    ShiftTicket[] @relation("Approver")
+  auditEvents       AuditEvent[]  @relation("Actor")
+
+  @@unique([tenantId, username])
+  @@index([tenantId])
+}
+
+/// One-time bootstrap per user
+model InviteCode {
+  id         String    @id @default(cuid())
+  tenantId   String
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash   String
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([tenantId])
+  @@index([userId])
+}
+
+/// 96 slots per calendar day in app timezone (15 min). shiftDate is the local calendar date.
+model ShiftTicket {
+  id            String        @id @default(cuid())
+  tenantId      String
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requestorId   String
+  requestor     User          @relation("Requestor", fields: [requestorId], references: [id], onDelete: Cascade)
+  /// Local date in America/Winnipeg
+  shiftDate     DateTime      @db.Date
+  /// 0..95 inclusive start; endSlot exclusive (e.g. 32..36 = 8:00–9:00)
+  startSlot     Int
+  endSlot       Int
+  siteTeam      String?
+  skillTag      String?
+  status        TicketStatus  @default(PENDING)
+  claimerId     String?
+  claimer       User?         @relation("Claimer", fields: [claimerId], references: [id], onDelete: SetNull)
+  /// Leader or Ops who approved/declined
+  approverId    String?
+  approver      User?         @relation("Approver", fields: [approverId], references: [id], onDelete: SetNull)
+  decisionNotes String?
+  decidedAt     DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  auditEvents AuditEvent[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, shiftDate, startSlot])
+  @@index([requestorId])
+}
+
+model AuditEvent {
+  id         String      @id @default(cuid())
+  tenantId   String
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  action     AuditAction
+  /// e.g. ShiftTicket, User
+  entityType String
+  entityId   String
+  actorId    String
+  actor      User        @relation("Actor", fields: [actorId], references: [id], onDelete: Cascade)
+  /// requestorId, claimerId, approverId, rule snapshot, etc.
+  payload    Json
+  createdAt  DateTime    @default(now())
+
+  shiftTicketId String?
+  shiftTicket   ShiftTicket? @relation(fields: [shiftTicketId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([entityType, entityId])
+  @@index([shiftTicketId])
+}
+
+/// Pre-aggregated daily stats (refreshed by job)
+model AnalyticsDaily {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  day       DateTime @db.Date
+  ticketsCreated   Int @default(0)
+  claimsMade       Int @default(0)
+  approved         Int @default(0)
+  declined         Int @default(0)
+  cancelled        Int @default(0)
+  expired          Int @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, day])
+  @@index([tenantId])
+}
