@@ -65,7 +65,10 @@ model User {
   tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   /// Login name; unique per tenant
   username     String
-  passwordHash String
+  /// Supabase Auth user id (`auth.users.id`); null until linked (e.g. invite-only user before registration).
+  authUserId   String?    @unique @db.Uuid
+  /// Legacy bcrypt hash; unused when `authUserId` is set (password lives in Supabase Auth).
+  passwordHash String?
   role         Role
   /// Shown to other agents (aliases-only peer view)
   publicAlias  String

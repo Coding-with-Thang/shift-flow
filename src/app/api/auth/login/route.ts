@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { verifyPassword } from "@/lib/auth/password";
-import { setSessionCookie } from "@/lib/auth/session";
+import { loginEmailForTenantUser } from "@/lib/auth/login-email";
 import { writeAudit } from "@/lib/audit";
+import { createClient } from "@/lib/server";
 
 const bodySchema = z.object({
   tenantCode: z.string().min(1),
@@ -31,12 +31,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid tenant or credentials" }, { status: 401 });
   }
 
-  const ok = await verifyPassword(password, user.passwordHash);
-  if (!ok) {
+  if (!user.authUserId) {
+    return NextResponse.json(
+      {
+        error:
+          "Account not linked to sign-in yet. Ask your administrator to set your password or finish account setup.",
+      },
+      { status: 401 },
+    );
+  }
+
+  let email: string;
+  try {
+    email = loginEmailForTenantUser(tenant.tenantCode, username);
+  } catch {
     return NextResponse.json({ error: "Invalid tenant or credentials" }, { status: 401 });
   }
 
-  await setSessionCookie({ sub: user.id, tenantId: user.tenantId, role: user.role });
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) {
+    return NextResponse.json({ error: "Invalid tenant or credentials" }, { status: 401 });
+  }
+
   await writeAudit({
     tenantId: user.tenantId,
     action: "LOGIN_SUCCESS",

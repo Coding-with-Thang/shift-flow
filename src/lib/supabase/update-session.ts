@@ -1,0 +1,59 @@
+import { createServerClient } from "@supabase/ssr";
+import { NextResponse, type NextRequest } from "next/server";
+
+/**
+ * Refreshes Supabase cookies on each matched request; redirects unauthenticated
+ * browser navigations away from protected pages.
+ */
+export async function updateSession(request: NextRequest) {
+  let supabaseResponse = NextResponse.next({
+    request,
+  });
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          supabaseResponse = NextResponse.next({
+            request,
+          });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options),
+          );
+        },
+      },
+    },
+  );
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const path = request.nextUrl.pathname;
+  const isPublicPage = path === "/" || path.startsWith("/login");
+  const isPublicApi = path.startsWith("/api/auth/");
+  const isApi = path.startsWith("/api/");
+  /** Dev-only: browse any page without signing in. Production still enforces auth on non-public routes. */
+  const allowUnauthenticatedPagesInDev =
+    process.env.NODE_ENV === "development";
+
+  if (
+    !user &&
+    !isPublicPage &&
+    !isPublicApi &&
+    !isApi &&
+    !allowUnauthenticatedPagesInDev
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
+
+  return supabaseResponse;
+}

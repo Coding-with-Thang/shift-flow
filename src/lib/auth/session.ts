@@ -1,8 +1,7 @@
-import { cookies } from "next/headers";
-import { SignJWT, jwtVerify } from "jose";
-import type { Role } from "@prisma/client";
-
-const COOKIE = "session";
+import type { Role, User } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/db";
+import { createClient } from "@/lib/server";
 
 export type SessionPayload = {
   sub: string;
@@ -10,54 +9,117 @@ export type SessionPayload = {
   role: Role;
 };
 
-function getSecret() {
-  const s = process.env.SESSION_SECRET;
-  if (!s || s.length < 32) {
-    throw new Error("SESSION_SECRET must be set (min 32 chars)");
+/** Connection / startup failures — safe to degrade without auth instead of crashing RSC. */
+function isPrismaUnavailableError(error: unknown): boolean {
+  if (error instanceof Prisma.PrismaClientInitializationError) return true;
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    (error.code === "P1001" || error.code === "P1017")
+  ) {
+    return true;
   }
-  return new TextEncoder().encode(s);
+  if (typeof error !== "object" || error === null) return false;
+  const e = error as { name?: string; message?: string };
+  if (e.name === "PrismaClientInitializationError") return true;
+  if (typeof e.message === "string" && e.message.includes("Can't reach database server")) {
+    return true;
+  }
+  return false;
 }
 
-export async function createSessionToken(payload: SessionPayload) {
-  return new SignJWT({ role: payload.role, tenantId: payload.tenantId })
-    .setProtectedHeader({ alg: "HS256" })
-    .setSubject(payload.sub)
-    .setIssuedAt()
-    .setExpirationTime("7d")
-    .sign(getSecret());
+/**
+ * When true, requests without a Supabase user still get a real `User` row from the DB
+ * (default: active super admin on tenant `demo`) so APIs and server components work.
+ *
+ * Enabled in development, or in production if `SCHEDULER_ALLOW_OPEN_SUPER_ADMIN=true`
+ * (trusted hosts only).
+ *
+ * Override persona with `DEV_AUTH_TENANT_CODE` (default `demo`) and `DEV_AUTH_USERNAME`.
+ */
+export function isAnonymousSessionBypassEnabled(): boolean {
+  return (
+    process.env.NODE_ENV !== "production" ||
+    process.env.SCHEDULER_ALLOW_OPEN_SUPER_ADMIN === "true"
+  );
 }
 
-export async function setSessionCookie(payload: SessionPayload) {
-  const token = await createSessionToken(payload);
-  const jar = await cookies();
-  jar.set(COOKIE, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 7,
-  });
-}
+async function resolveDevBypassUser(): Promise<User | null> {
+  try {
+    const tenantCode = process.env.DEV_AUTH_TENANT_CODE?.trim() || "demo";
+    const usernameOverride = process.env.DEV_AUTH_USERNAME?.trim();
 
-export async function clearSessionCookie() {
-  const jar = await cookies();
-  jar.set(COOKIE, "", { httpOnly: true, path: "/", maxAge: 0 });
+    const tenant =
+      (await prisma.tenant.findUnique({
+        where: { tenantCode },
+      })) ?? (await prisma.tenant.findFirst());
+
+    if (!tenant) return null;
+
+    if (usernameOverride) {
+      const user = await prisma.user.findUnique({
+        where: {
+          tenantId_username: { tenantId: tenant.id, username: usernameOverride },
+        },
+      });
+      if (!user || user.status !== "ACTIVE") return null;
+      return user;
+    }
+
+    const superAdmin = await prisma.user.findFirst({
+      where: {
+        tenantId: tenant.id,
+        status: "ACTIVE",
+        role: "SUPER_ADMIN",
+        username: { not: "_system" },
+      },
+    });
+    if (superAdmin) return superAdmin;
+
+    return prisma.user.findFirst({
+      where: { tenantId: tenant.id, status: "ACTIVE" },
+    });
+  } catch (error) {
+    if (!isPrismaUnavailableError(error)) throw error;
+    return null;
+  }
 }
 
 export async function getSession(): Promise<SessionPayload | null> {
-  const jar = await cookies();
-  const token = jar.get(COOKIE)?.value;
-  if (!token) return null;
-  try {
-    const { payload } = await jwtVerify(token, getSecret());
-    const sub = payload.sub;
-    const tenantId = payload.tenantId as string | undefined;
-    const role = payload.role as Role | undefined;
-    if (!sub || !tenantId || !role) return null;
-    return { sub, tenantId, role };
-  } catch {
-    return null;
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (!error && user?.id) {
+    try {
+      const row = await prisma.user.findUnique({
+        where: { authUserId: user.id },
+      });
+      if (row && row.status === "ACTIVE") {
+        return {
+          sub: row.id,
+          tenantId: row.tenantId,
+          role: row.role,
+        };
+      }
+    } catch (err) {
+      if (!isPrismaUnavailableError(err)) throw err;
+    }
   }
+
+  if (isAnonymousSessionBypassEnabled()) {
+    const row = await resolveDevBypassUser();
+    if (row) {
+      return {
+        sub: row.id,
+        tenantId: row.tenantId,
+        role: row.role,
+      };
+    }
+  }
+
+  return null;
 }
 
 export async function requireSession(): Promise<SessionPayload> {

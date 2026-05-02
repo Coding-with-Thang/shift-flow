@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { clearSessionCookie, getSession } from "@/lib/auth/session";
 import { writeAudit } from "@/lib/audit";
+import { getSession } from "@/lib/auth/session";
+import { createClient } from "@/lib/server";
 
 export async function POST() {
   const s = await getSession();
@@ -14,6 +15,9 @@ export async function POST() {
       payload: {},
     });
   }
-  await clearSessionCookie();
+
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+
   return NextResponse.json({ ok: true });
 }

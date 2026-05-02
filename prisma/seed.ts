@@ -1,16 +1,37 @@
 import dotenv from "dotenv";
 import { PrismaClient } from "@prisma/client";
+import { loginEmailForTenantUser } from "../src/lib/auth/login-email";
+import { createServiceRoleClient, upsertAuthPasswordUser } from "../src/lib/supabase/service-role";
 
-// Same resolution order as Next.js: base env, then `.env.local` overrides (e.g. Supabase DATABASE_URL).
 dotenv.config({ path: ".env" });
 dotenv.config({ path: ".env.local", override: true });
-import { hashPassword, hashInviteCode } from "../src/lib/auth/password";
 
 const prisma = new PrismaClient();
+
+async function linkAuthUser(tenantCode: string, tenantId: string, username: string, plainPassword: string) {
+  const admin = createServiceRoleClient();
+  const email = loginEmailForTenantUser(tenantCode, username);
+  const row = await prisma.user.findUnique({
+    where: { tenantId_username: { tenantId, username } },
+  });
+  if (!row) throw new Error(`Missing seeded user: ${username}`);
+  const authId = await upsertAuthPasswordUser(admin, email, plainPassword, {
+    prisma_user_id: row.id,
+    tenant_code: tenantCode,
+    username: row.username,
+  });
+  await prisma.user.update({
+    where: { id: row.id },
+    data: { authUserId: authId, passwordHash: null },
+  });
+}
 
 async function main() {
   if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL is required to run seed");
+  }
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY is required to link users to Supabase Auth");
   }
 
   const tenant = await prisma.tenant.upsert({
@@ -22,16 +43,6 @@ async function main() {
   const opsPass = "ChangeMeOps!23";
   const leaderPass = "ChangeMeLeader!23";
   const agentPass = "ChangeMeAgent!23";
-  const tempPass =
-    process.env.SEED_TEMP_PASSWORD?.trim() && process.env.SEED_TEMP_PASSWORD.length >= 8
-      ? process.env.SEED_TEMP_PASSWORD.trim()
-      : "TempUser!123456";
-
-  const superAdminPass =
-    process.env.SEED_SUPER_ADMIN_PASSWORD?.trim() &&
-    process.env.SEED_SUPER_ADMIN_PASSWORD.length >= 8
-      ? process.env.SEED_SUPER_ADMIN_PASSWORD.trim()
-      : "SuperAdmin!123456";
 
   await prisma.user.upsert({
     where: { tenantId_username: { tenantId: tenant.id, username: "ops" } },
@@ -40,7 +51,8 @@ async function main() {
       username: "ops",
       publicAlias: "Ops One",
       role: "OPS_MANAGER",
-      passwordHash: await hashPassword(opsPass),
+      passwordHash: null,
+      authUserId: null,
     },
     update: {},
   });
@@ -52,7 +64,8 @@ async function main() {
       username: "leader",
       publicAlias: "Leader One",
       role: "LEADER",
-      passwordHash: await hashPassword(leaderPass),
+      passwordHash: null,
+      authUserId: null,
     },
     update: {},
   });
@@ -61,92 +74,89 @@ async function main() {
     where: { tenantId_username: { tenantId: tenant.id, username: "agent" } },
     create: {
       tenantId: tenant.id,
-      username: "agent",
-      publicAlias: "Agent Apple",
+      username: "agent1",
+      publicAlias: "Agent One",
       role: "AGENT",
-      passwordHash: await hashPassword(agentPass),
+      passwordHash: null,
+      authUserId: null,
     },
     update: {},
   });
 
   await prisma.user.upsert({
-    where: { tenantId_username: { tenantId: tenant.id, username: "temp" } },
+    where: { tenantId_username: { tenantId: tenant.id, username: "agent2" } },
     create: {
       tenantId: tenant.id,
-      username: "temp",
-      publicAlias: "Temp User",
+      username: "agent2",
+      publicAlias: "Agent Two",
       role: "AGENT",
-      passwordHash: await hashPassword(tempPass),
-    },
-    update: { passwordHash: await hashPassword(tempPass) },
-  });
-
-  await prisma.user.upsert({
-    where: { tenantId_username: { tenantId: tenant.id, username: "superadmin" } },
-    create: {
-      tenantId: tenant.id,
-      username: "superadmin",
-      publicAlias: "Super Admin",
-      role: "SUPER_ADMIN",
-      status: "ACTIVE",
-      passwordHash: await hashPassword(superAdminPass),
-    },
-    update: { passwordHash: await hashPassword(superAdminPass), status: "ACTIVE" },
-  });
-
-  const inviteUser = await prisma.user.upsert({
-    where: { tenantId_username: { tenantId: tenant.id, username: "rook" } },
-    create: {
-      tenantId: tenant.id,
-      username: "rook",
-      publicAlias: "Agent Rook",
-      role: "AGENT",
-      passwordHash: await hashPassword(Math.random().toString(36)),
+      passwordHash: null,
+      authUserId: null,
     },
     update: {},
   });
 
-  await prisma.inviteCode.deleteMany({ where: { userId: inviteUser.id } });
-  const plainInvite = "demo-invite-rook";
-  await prisma.inviteCode.create({
-    data: {
-      tenantId: tenant.id,
-      userId: inviteUser.id,
-      codeHash: await hashInviteCode(plainInvite),
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-    },
-  });
-
   await prisma.user.upsert({
-    where: { tenantId_username: { tenantId: tenant.id, username: "_system" } },
+    where: { tenantId_username: { tenantId: tenant.id, username: "agent3" } },
     create: {
       tenantId: tenant.id,
-      username: "_system",
-      publicAlias: "System",
-      role: "SUPER_ADMIN",
-      status: "DISABLED",
-      passwordHash: await hashPassword(Math.random().toString(36)),
+      username: "agent3",
+      publicAlias: "Agent Three",
+      role: "AGENT",
+      passwordHash: null,
+      authUserId: null,
     },
     update: {},
   });
 
-  console.log("Seed OK — tenantCode: demo");
-  console.log("Sign in: tenantCode demo + username + password");
-  console.log("temp /", tempPass, "(set SEED_TEMP_PASSWORD to customize)");
-  console.log(
-    "superadmin /",
-    superAdminPass,
-    "(SUPER_ADMIN; set SEED_SUPER_ADMIN_PASSWORD to customize)",
-  );
+  await prisma.user.upsert({
+    where: { tenantId_username: { tenantId: tenant.id, username: "agent4" } },
+    create: {
+      tenantId: tenant.id,
+      username: "agent4",
+      publicAlias: "Agent Four",
+      role: "AGENT",
+      passwordHash: null,
+      authUserId: null,
+    },
+    update: {},
+  });
+
+  const tc = tenant.tenantCode;
+  await linkAuthUser(tc, tenant.id, "ops", opsPass);
+  await linkAuthUser(tc, tenant.id, "leader", leaderPass);
+  await linkAuthUser(tc, tenant.id, "agent1", agentPass);
+  await linkAuthUser(tc, tenant.id, "agent2", agentPass);
+  await linkAuthUser(tc, tenant.id, "agent3", agentPass);
+  await linkAuthUser(tc, tenant.id, "agent4", agentPass);
+
+  console.log("Seed OK — tenantCode: demo (Supabase Auth)");
+  console.log("Sign in: tenant code + username + password (same as before)");
   console.log("ops /", opsPass);
   console.log("leader /", leaderPass);
-  console.log("agent /", agentPass);
-  console.log("rook: register with invite:", plainInvite, "then set password");
+  console.log("agent1..agent4 /", agentPass);
+}
+
+function isDbUnreachable(e: unknown) {
+  return (
+    typeof e === "object" &&
+    e !== null &&
+    "code" in e &&
+    (e as { code?: string }).code === "P1001"
+  );
 }
 
 main()
   .then(() => prisma.$disconnect())
   .catch(async (e) => {
+    if (isDbUnreachable(e)) {
+      console.error(`
+Could not connect to Postgres (P1001). Common fixes:
+  • Supabase Dashboard → restore or resume the project if it is paused.
+  • Settings → Database → copy the "Session pooler" connection string (port 6543) if direct port 5432 is blocked on your network.
+  • For the direct host (port 5432), append ?sslmode=require to DATABASE_URL if missing.
+`);
+    }
     console.error(e);
     await prisma.$disconnect();
     process.exit(1);

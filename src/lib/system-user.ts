@@ -1,5 +1,4 @@
 import { prisma } from "./db";
-import { hashPassword } from "./auth/password";
 
 const SYSTEM_USERNAME = "_system";
 
@@ -9,13 +8,12 @@ export async function ensureSystemUser(tenantId: string) {
     where: { tenantId, username: SYSTEM_USERNAME },
   });
   if (existing) return existing;
-  const random = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
-  const passwordHash = await hashPassword(random);
   return prisma.user.create({
     data: {
       tenantId,
       username: SYSTEM_USERNAME,
-      passwordHash,
+      passwordHash: null,
+      authUserId: null,
       role: "SUPER_ADMIN",
       publicAlias: "System",
       status: "DISABLED",
