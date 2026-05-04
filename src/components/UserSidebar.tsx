@@ -17,14 +17,19 @@ const menuItems = [
 export function UserSidebar() {
   const pathname = usePathname();
   const [showAdminPortal, setShowAdminPortal] = useState(false);
+  const [canShowMyActivity, setCanShowMyActivity] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const res = await fetch("/api/me", { credentials: "include" });
       const data = await res.json().catch(() => ({}));
-      if (!cancelled && data?.user?.role && !isAgent(data.user.role)) {
-        setShowAdminPortal(true);
+      if (!cancelled && data?.user?.role) {
+        const role = data.user.role;
+        if (!isAgent(role)) {
+          setShowAdminPortal(true);
+        }
+        setCanShowMyActivity(isAgent(role));
       }
     })();
     return () => {
@@ -32,9 +37,9 @@ export function UserSidebar() {
     };
   }, []);
 
-  const visibleItems = showAdminPortal
-    ? menuItems
-    : menuItems.filter((item) => item.href !== "/admin");
+  const visibleItems = menuItems
+    .filter((item) => showAdminPortal || item.href !== "/admin")
+    .filter((item) => canShowMyActivity || item.href !== "/my-activity");
 
   return (
     <aside className="w-[240px] shrink-0 border-r border-zinc-200 flex flex-col bg-[#FAFAFA] h-full">
