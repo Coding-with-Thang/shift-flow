@@ -11,7 +11,7 @@ export default function NotFound() {
           <div className="w-[4px] h-[18px] bg-white rounded-full"></div>
           <div className="w-[4px] h-3.5 bg-white rounded-full"></div>
         </div>
-        <div className="w-[1px] h-5 bg-zinc-300"></div>
+        <div className="w-px h-5 bg-zinc-300"></div>
         <span className="font-medium tracking-[0.15em] text-[13px] text-zinc-800 uppercase pt-0.5">
           ShiftFlow
         </span>
@@ -25,7 +25,7 @@ export default function NotFound() {
 
         <div className="w-full border border-zinc-900/15 p-8 flex flex-col mb-8 bg-[#f4f4f5]">
           <div className="flex items-center gap-2.5 mb-5 text-[13px] font-medium tracking-wide">
-            <AlertCircle className="w-4 h-4 stroke-[2]" />
+            <AlertCircle className="w-4 h-4 stroke-2" />
             <span className="uppercase tracking-wider">
               System Notification
             </span>

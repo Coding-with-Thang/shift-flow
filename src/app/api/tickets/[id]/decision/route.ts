@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireSession } from "@/lib/auth/session";
-import { canApprove, isSuperAdmin } from "@/lib/rbac";
+import { canApproveShiftTicket, isSuperAdmin } from "@/lib/rbac";
 import { writeAudit } from "@/lib/audit";
 import { serializeTicketPublic } from "@/lib/tickets/serialize";
 
@@ -16,8 +16,11 @@ type Params = { params: Promise<{ id: string }> };
 export async function POST(req: Request, ctx: Params) {
   const session = await requireSession().catch(() => null);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!canApprove(session.role)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!canApproveShiftTicket(session.role)) {
+    return NextResponse.json(
+      { error: "You do not have permission to approve or decline shift swaps" },
+      { status: 403 },
+    );
   }
 
   const { id } = await ctx.params;

@@ -5,8 +5,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum Role {
@@ -42,6 +43,7 @@ enum AuditAction {
   INVITE_ISSUED
   LOGIN_SUCCESS
   LOGOUT
+  PASSWORD_RESET
 }
 
 model Tenant {
@@ -51,6 +53,10 @@ model Tenant {
   tenantCode String   @unique
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
+  /// Optional restriction: users can only post shifts within these slots (0..96)
+  operatingHoursStart Int?
+  operatingHoursEnd   Int?
 
   users         User[]
   shiftTickets  ShiftTicket[]
@@ -73,6 +79,8 @@ model User {
   /// Shown to other agents (aliases-only peer view)
   publicAlias  String
   status       UserStatus @default(ACTIVE)
+  /// True when the user must set their own password (e.g. initial temp password for non–super-admin accounts).
+  mustChangePassword Boolean @default(false)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -152,6 +160,7 @@ model AuditEvent {
   shiftTicket   ShiftTicket? @relation(fields: [shiftTicketId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, createdAt])
+  @@index([tenantId, action, createdAt])
   @@index([entityType, entityId])
   @@index([shiftTicketId])
 }

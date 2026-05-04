@@ -27,7 +27,6 @@ async function main() {
     return { inserted: inserted[0], now: now[0]?.now };
   });
 
-  // eslint-disable-next-line no-console
   console.log({
     ok: true,
     now: result.now?.toISOString(),
@@ -41,7 +40,6 @@ async function main() {
 
 main()
   .catch((err) => {
-    // eslint-disable-next-line no-console
     console.error({ ok: false, error: String(err), stack: err?.stack });
     process.exitCode = 1;
   })

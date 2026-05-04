@@ -8,6 +8,11 @@ export function canApprove(role: Role) {
   return role === "LEADER" || role === "OPS_MANAGER" || role === "SUPER_ADMIN";
 }
 
+/** Leaders, ops managers, and super admins may approve or decline a claimed shift swap (APPROVED / DECLINED). */
+export function canApproveShiftTicket(role: Role) {
+  return canApprove(role);
+}
+
 /** Ops managers and super admins (tenant-wide administration). */
 export function canManageUsers(role: Role) {
   return role === "OPS_MANAGER" || role === "SUPER_ADMIN";
@@ -34,6 +39,21 @@ export function isAgent(role: Role) {
   return role === "AGENT";
 }
 
+/** Who may claim an open marketplace ticket (same as posting: agents only). */
+export function canClaimShift(role: Role) {
+  return isAgent(role);
+}
+
 export function canViewAnalytics(role: Role) {
   return role === "LEADER" || role === "OPS_MANAGER" || role === "SUPER_ADMIN";
+}
+
+/**
+ * Tenant admin (super admin): may issue a temp password reset for agents only.
+ * Operations: may reset agents and leaders. Others cannot reset via this flow.
+ */
+export function canResetUserPassword(actor: Role, target: Role): boolean {
+  if (actor === "SUPER_ADMIN") return target === "AGENT";
+  if (actor === "OPS_MANAGER") return target === "AGENT" || target === "LEADER";
+  return false;
 }

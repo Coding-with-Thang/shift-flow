@@ -1,6 +1,12 @@
 "use client";
 
-import { useFilterStore } from "@/store/useFilterStore";
+import {
+  useFilterStore,
+  type WorkType,
+  type TimeBucket,
+  type DateRange,
+  type SortOption,
+} from "@/store/useFilterStore";
 import { ChevronDown } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 
@@ -33,7 +39,7 @@ export function ShiftFilters() {
             {["All", "Calls", "Chat", "Calls - Bilingual", "Chat - Bilingual"].map((type) => (
               <button
                 key={type}
-                onClick={() => store.setWorkType(type as any)}
+                onClick={() => store.setWorkType(type as WorkType)}
                 className={`px-3 py-1.5 font-medium rounded-sm transition-colors ${
                   store.workType === type
                     ? "bg-zinc-100 text-zinc-900 shadow-sm border border-zinc-200"
@@ -50,7 +56,7 @@ export function ShiftFilters() {
             {["All", "Morning", "Mid-Day", "Evening"].map((bucket) => (
               <button
                 key={bucket}
-                onClick={() => store.setTimeBucket(bucket as any)}
+                onClick={() => store.setTimeBucket(bucket as TimeBucket)}
                 className={`px-3 py-1.5 font-medium rounded-sm transition-colors ${
                   store.timeBucket === bucket
                     ? "bg-zinc-100 text-zinc-900 shadow-sm border border-zinc-200"
@@ -67,7 +73,7 @@ export function ShiftFilters() {
             {["All", "Today", "Tomorrow", "Next 7 Days"].map((dr) => (
               <button
                 key={dr}
-                onClick={() => store.setDateRange(dr as any)}
+                onClick={() => store.setDateRange(dr as DateRange)}
                 className={`px-3 py-1.5 font-medium rounded-sm transition-colors ${
                   store.dateRange === dr
                     ? "bg-zinc-100 text-zinc-900 shadow-sm border border-zinc-200"
@@ -119,7 +125,7 @@ export function ShiftFilters() {
           <span className="text-zinc-500">Sort by:</span>
           <select
             value={store.sortBy}
-            onChange={(e) => store.setSortBy(e.target.value as any)}
+            onChange={(e) => store.setSortBy(e.target.value as SortOption)}
             className="pl-2 pr-8 py-1.5 border border-zinc-200 rounded-sm bg-white hover:bg-slate-50 outline-none focus:border-zinc-400 appearance-none"
             style={{ backgroundPosition: "right 0.5rem center", backgroundRepeat: "no-repeat", backgroundImage: "url(\"data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e\")" }}
           >

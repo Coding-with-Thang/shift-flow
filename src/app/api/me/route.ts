@@ -11,9 +11,11 @@ export async function GET() {
     where: isSuperAdmin(s.role) ? { id: s.sub } : { id: s.sub, tenantId: s.tenantId },
     select: {
       id: true,
+      tenantId: true,
       username: true,
       role: true,
       publicAlias: true,
+      mustChangePassword: true,
       tenant: { select: { name: true, tenantCode: true } },
     },
   });

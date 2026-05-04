@@ -30,7 +30,11 @@ export default function LoginPage() {
         setError(data.error ?? "Login failed");
         return;
       }
-      router.push("/marketplace");
+      if (data.mustChangePassword) {
+        router.push("/account/change-password");
+      } else {
+        router.push("/marketplace");
+      }
       router.refresh();
     } finally {
       setLoading(false);
@@ -41,12 +45,12 @@ export default function LoginPage() {
     <div className="min-h-screen bg-[#f4f4f5] text-zinc-900 flex flex-col items-center justify-center font-sans relative overflow-hidden">
       {/* Background shapes */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 flex justify-center items-center">
-        <div className="absolute top-[-20%] left-[-10%] w-[800px] h-[800px] border border-gray-200/50 bg-white/40 rotate-[15deg]" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[800px] h-[800px] border border-gray-200/50 bg-white/40 -rotate-[15deg]" />
+        <div className="absolute top-[-20%] left-[-10%] w-[800px] h-[800px] border border-gray-200/50 bg-white/40 rotate-15" />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[800px] h-[800px] border border-gray-200/50 bg-white/40 rotate-15" />
       </div>
 
       <div className="z-10 flex flex-col items-center mb-8 mt-12">
-        <div className="bg-black text-white font-bold tracking-[0.1em] px-4 py-1.5 text-xl mb-3">
+        <div className="bg-black text-white font-bold tracking-widest px-4 py-1.5 text-xl mb-3">
           SHIFTFLOW
         </div>
         <div className="text-[10px] tracking-[0.2em] text-zinc-600 font-semibold uppercase">
@@ -140,8 +144,8 @@ export default function LoginPage() {
 
       <div className="z-10 flex flex-col gap-5 text-center mb-12">
         <p className="text-[11px] text-zinc-700 font-medium max-w-sm mx-auto leading-relaxed">
-          Accounts are provisioned by your organization. Contact your administrator if you need
-          access.
+          Accounts are provisioned by your organization. Contact your
+          administrator if you need access.
         </p>
         <div className="flex gap-6 justify-center text-[9px] text-zinc-500 uppercase tracking-[0.15em] font-semibold">
           <Link href="#" className="hover:text-black transition-colors">

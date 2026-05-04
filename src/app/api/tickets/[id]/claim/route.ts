@@ -3,14 +3,15 @@ import { prisma } from "@/lib/db";
 import { requireSession } from "@/lib/auth/session";
 import { writeAudit } from "@/lib/audit";
 import { serializeTicketPublic } from "@/lib/tickets/serialize";
+import { canClaimShift } from "@/lib/rbac";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(_req: Request, ctx: Params) {
   const session = await requireSession().catch(() => null);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (session.role !== "AGENT") {
-    return NextResponse.json({ error: "Only agents can claim" }, { status: 403 });
+  if (!canClaimShift(session.role)) {
+    return NextResponse.json({ error: "Only agents can claim shifts" }, { status: 403 });
   }
 
   const { id } = await ctx.params;

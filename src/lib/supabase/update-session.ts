@@ -36,20 +36,11 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const isPublicPage = path === "/" || path.startsWith("/login");
+  const isPublicPage = path === "/login" || path.startsWith("/login/");
   const isPublicApi = path.startsWith("/api/auth/");
   const isApi = path.startsWith("/api/");
-  /** Dev-only: browse any page without signing in. Production still enforces auth on non-public routes. */
-  const allowUnauthenticatedPagesInDev =
-    process.env.NODE_ENV === "development";
 
-  if (
-    !user &&
-    !isPublicPage &&
-    !isPublicApi &&
-    !isApi &&
-    !allowUnauthenticatedPagesInDev
-  ) {
+  if (!user && !isPublicPage && !isPublicApi && !isApi) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);

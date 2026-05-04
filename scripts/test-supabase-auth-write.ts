@@ -29,7 +29,6 @@ async function main() {
   const { error: deleteErr } = await admin.auth.admin.deleteUser(userId);
   if (deleteErr) throw deleteErr;
 
-  // eslint-disable-next-line no-console
   console.log({
     ok: true,
     wrote_to_postgres_via_supabase_auth: true,
@@ -39,7 +38,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error({ ok: false, error: String(err), stack: err?.stack });
   process.exitCode = 1;
 });

@@ -21,6 +21,7 @@ export function serializeTicketPublic(t: TicketWithUsers) {
     tenantCode: t.tenant?.tenantCode,
     tenantName: t.tenant?.name,
     createdAt: t.createdAt.toISOString(),
+    updatedAt: t.updatedAt.toISOString(),
     decidedAt: t.decidedAt?.toISOString() ?? null,
   };
 }

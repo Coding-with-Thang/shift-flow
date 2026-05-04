@@ -8,22 +8,33 @@ import {
   Clock,
   Users,
   Activity,
+  BarChart3,
   ShieldCheck,
   Settings,
   HelpCircle,
-  LogOut,
   Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { canViewAnalytics } from "@/lib/rbac";
+import type { Role } from "@prisma/client";
 
-const menuItems = [
+const baseMenuItems = [
   { name: "Overview", icon: LayoutDashboard, href: "/admin" },
   { name: "Pending Shifts", icon: Clock, href: "/admin/pending-shifts" },
   { name: "Users", icon: Users, href: "/admin/users" },
   { name: "Shift Activities", icon: Activity, href: "/admin/shift-activities" },
+] as const;
+
+const analyticsMenuItem = {
+  name: "Analytics",
+  icon: BarChart3,
+  href: "/admin/analytics",
+} as const;
+
+const tailMenuItems = [
   { name: "Audit Log", icon: ShieldCheck, href: "/admin/audit-log" },
   { name: "Settings", icon: Settings, href: "/admin/settings" },
-];
+] as const;
 
 const superAdminMenuItem = {
   name: "Platform tenants",
@@ -31,21 +42,19 @@ const superAdminMenuItem = {
   href: "/admin/super",
 } as const;
 
-const bottomItems = [
-  { name: "Logout", icon: LogOut, href: "/logout" },
-];
-
 export function AdminSidebar() {
   const pathname = usePathname();
-  const [showSuperAdminNav, setShowSuperAdminNav] = useState(false);
+  const [role, setRole] = useState<Role | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const res = await fetch("/api/me", { credentials: "include" });
-      const data = await res.json().catch(() => ({}));
-      if (!cancelled && data?.user?.role === "SUPER_ADMIN") {
-        setShowSuperAdminNav(true);
+      const data = (await res.json().catch(() => ({}))) as {
+        user?: { role: Role } | null;
+      };
+      if (!cancelled) {
+        setRole(data?.user?.role ?? null);
       }
     })();
     return () => {
@@ -53,21 +62,31 @@ export function AdminSidebar() {
     };
   }, []);
 
-  const items = showSuperAdminNav ? [...menuItems, superAdminMenuItem] : menuItems;
+  const showSuperAdminNav = role === "SUPER_ADMIN";
+  const showAnalytics = role !== null && canViewAnalytics(role);
+
+  const items = [
+    ...baseMenuItems,
+    ...(showAnalytics ? [analyticsMenuItem] : []),
+    ...tailMenuItems,
+    ...(showSuperAdminNav ? [superAdminMenuItem] : []),
+  ];
 
   return (
-    <aside className="w-[200px] bg-[#F8FAFC] border-r border-[#E2E8F0] flex flex-col h-screen sticky top-0">
-      {/* Profile Section */}
-      <div className="p-6 border-b border-[#E2E8F0]">
-        <div className="flex items-center gap-3 mb-1">
-          <div className="flex flex-col gap-1">
-            <h2 className="text-lg font-bold text-zinc-900 leading-tight">Admin Portal</h2>
-            <p className="text-[12px] text-zinc-500 font-medium">Global Operations</p>
+    <aside className="w-[220px] bg-zinc-950 border-r border-zinc-800 flex flex-col h-screen sticky top-0 text-zinc-300">
+      <div className="p-6 border-b border-zinc-800">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 shrink-0 rounded-sm bg-white text-zinc-950 flex items-center justify-center text-xs font-black tracking-tighter">
+            SF
+          </div>
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <h2 className="text-[11px] font-bold text-white leading-tight tracking-wide uppercase">
+              Admin Portal
+            </h2>
           </div>
         </div>
       </div>
 
-      {/* Navigation Menu */}
       <nav className="flex-1 py-6">
         <div className="px-3 space-y-1">
           {items.map((item) => {
@@ -79,11 +98,18 @@ export function AdminSidebar() {
                 className={cn(
                   "flex items-center gap-3 px-3 py-3 rounded-sm transition-colors group",
                   isActive
-                    ? "bg-white border border-[#E2E8F0] shadow-sm text-black"
-                    : "text-zinc-500 hover:text-black hover:bg-zinc-100"
+                    ? "bg-zinc-900 border border-zinc-700 text-white shadow-sm"
+                    : "text-zinc-400 hover:text-white hover:bg-zinc-900/60 border border-transparent",
                 )}
               >
-                <item.icon className={cn("w-5 h-5", isActive ? "text-black" : "text-zinc-400 group-hover:text-black")} />
+                <item.icon
+                  className={cn(
+                    "w-5 h-5 shrink-0",
+                    isActive
+                      ? "text-white"
+                      : "text-zinc-500 group-hover:text-white",
+                  )}
+                />
                 <span className="text-sm font-medium">{item.name}</span>
               </Link>
             );
@@ -91,18 +117,14 @@ export function AdminSidebar() {
         </div>
       </nav>
 
-      {/* Bottom Menu */}
-      <div className="p-3 border-t border-[#E2E8F0] space-y-1">
-        {bottomItems.map((item) => (
-          <Link
-            key={item.name}
-            href={item.href}
-            className="flex items-center gap-3 px-3 py-3 text-zinc-500 hover:text-black hover:bg-zinc-100 rounded-sm transition-colors group"
-          >
-            <item.icon className="w-5 h-5 text-zinc-400 group-hover:text-black" />
-            <span className="text-sm font-medium">{item.name}</span>
-          </Link>
-        ))}
+      <div className="p-3 border-t border-zinc-800 space-y-1">
+        <Link
+          href="/admin/settings"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm font-medium text-zinc-400 hover:text-white hover:bg-zinc-900/60 transition-colors"
+        >
+          <HelpCircle className="w-5 h-5 text-zinc-500" />
+          Support
+        </Link>
       </div>
     </aside>
   );

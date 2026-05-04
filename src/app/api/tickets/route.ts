@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getSession, requireSession } from "@/lib/auth/session";
 import { writeAudit } from "@/lib/audit";
-import { assertValidSlotRange } from "@/lib/slots";
+import { assertValidSlotRange, formatSlot } from "@/lib/slots";
 import { canApprove } from "@/lib/rbac";
 import { serializeTicketPublic } from "@/lib/tickets/serialize";
 import { resolveTenantListScope } from "@/lib/tenant-scope";
@@ -39,18 +39,31 @@ export async function GET(req: Request) {
       where: {
         ...tenantFilter,
         status: "PENDING",
-        NOT: { requestorId: session.sub },
       },
       orderBy: [{ shiftDate: "asc" }, { startSlot: "asc" }],
       include: baseInclude,
     });
-    return NextResponse.json({ tickets: rows.map(serializeTicketPublic) });
+    return NextResponse.json({
+      tickets: rows.map((row) => ({
+        ...serializeTicketPublic(row),
+        isMine: row.requestorId === session.sub,
+      })),
+    });
   }
 
   if (view === "mine") {
     const rows = await prisma.shiftTicket.findMany({
       where: { ...tenantFilter, requestorId: session.sub },
-      orderBy: { createdAt: "desc" },
+      orderBy: { shiftDate: "desc" },
+      include: baseInclude,
+    });
+    return NextResponse.json({ tickets: rows.map(serializeTicketPublic) });
+  }
+
+  if (view === "claimed") {
+    const rows = await prisma.shiftTicket.findMany({
+      where: { ...tenantFilter, claimerId: session.sub },
+      orderBy: { shiftDate: "desc" },
       include: baseInclude,
     });
     return NextResponse.json({ tickets: rows.map(serializeTicketPublic) });
@@ -66,6 +79,35 @@ export async function GET(req: Request) {
       include: baseInclude,
     });
     return NextResponse.json({ tickets: rows.map(serializeTicketPublic) });
+  }
+
+  if (view === "dashboard") {
+    const [available, mine, claimed] = await Promise.all([
+      prisma.shiftTicket.findMany({
+        where: { ...tenantFilter, status: "PENDING" },
+        orderBy: [{ shiftDate: "asc" }, { startSlot: "asc" }],
+        include: baseInclude,
+      }),
+      prisma.shiftTicket.findMany({
+        where: { ...tenantFilter, requestorId: session.sub },
+        orderBy: { shiftDate: "desc" },
+        include: baseInclude,
+      }),
+      prisma.shiftTicket.findMany({
+        where: { ...tenantFilter, claimerId: session.sub },
+        orderBy: { shiftDate: "desc" },
+        include: baseInclude,
+      }),
+    ]);
+
+    return NextResponse.json({
+      available: available.map((row) => ({
+        ...serializeTicketPublic(row),
+        isMine: row.requestorId === session.sub,
+      })),
+      mine: mine.map(serializeTicketPublic),
+      claimed: claimed.map(serializeTicketPublic),
+    });
   }
 
   return NextResponse.json({ error: "Unknown view" }, { status: 400 });
@@ -86,8 +128,26 @@ export async function POST(req: Request) {
   const { shiftDate, startSlot, endSlot, siteTeam, skillTag } = parsed.data;
   try {
     assertValidSlotRange(startSlot, endSlot);
-  } catch {
-    return NextResponse.json({ error: "Invalid slots" }, { status: 400 });
+    
+    // Check operating hours
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: session.tenantId },
+      select: { operatingHoursStart: true, operatingHoursEnd: true },
+    });
+
+    if (tenant?.operatingHoursStart !== null && tenant?.operatingHoursStart !== undefined) {
+      if (startSlot < tenant.operatingHoursStart) {
+        return NextResponse.json({ error: `Shift starts before business hours (${formatSlot(tenant.operatingHoursStart)})` }, { status: 400 });
+      }
+    }
+    if (tenant?.operatingHoursEnd !== null && tenant?.operatingHoursEnd !== undefined) {
+      if (endSlot > tenant.operatingHoursEnd) {
+        return NextResponse.json({ error: `Shift ends after business hours (${formatSlot(tenant.operatingHoursEnd)})` }, { status: 400 });
+      }
+    }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Invalid slots";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 
   const date = new Date(`${shiftDate}T12:00:00.000Z`);

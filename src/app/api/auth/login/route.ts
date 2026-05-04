@@ -65,6 +65,7 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     ok: true,
+    mustChangePassword: user.mustChangePassword,
     user: { id: user.id, role: user.role, publicAlias: user.publicAlias },
   });
 }

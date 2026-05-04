@@ -10,6 +10,7 @@ import { loginEmailForTenantUser } from "@/lib/auth/login-email";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceRoleClient, upsertAuthPasswordUser } from "@/lib/supabase/service-role";
 import { writeAudit } from "@/lib/audit";
+import { generateTempPassword } from "@/lib/auth/temp-password";
 
 const createSchema = z.object({
   username: z.string().min(2).max(64),
@@ -17,12 +18,51 @@ const createSchema = z.object({
   role: z.enum(["AGENT", "LEADER", "OPS_MANAGER", "SUPER_ADMIN"]),
   /** Required when the creator is SUPER_ADMIN (which tenant to attach the user to). */
   tenantId: z.string().min(1).optional(),
-  /** Optional initial password; if omitted, user signs up via invite only. */
+  /** Optional initial password. Super admins: omit for invite-only. Other roles: omit to auto-generate a temp password (returned once as `temporaryPassword`). */
   password: z.string().min(8).optional(),
 });
 
 function randomInvite(): string {
   return randomBytes(12).toString("hex");
+}
+
+function userDirectoryId(userId: string): string {
+  const tail = userId.replace(/[^a-zA-Z0-9]/g, "").slice(-4).toUpperCase();
+  return tail.length >= 4 ? `USR-${tail}` : `USR-${userId.slice(0, 4).toUpperCase()}`;
+}
+
+export async function GET() {
+  const session = await requireSession().catch(() => null);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!canProvisionUsers(session.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const rows = await prisma.user.findMany({
+    where: {
+      tenantId: session.tenantId,
+      username: { not: "_system" },
+    },
+    orderBy: { username: "asc" },
+    select: {
+      id: true,
+      username: true,
+      publicAlias: true,
+      role: true,
+      status: true,
+    },
+  });
+
+  return NextResponse.json({
+    users: rows.map((u) => ({
+      id: u.id,
+      directoryId: userDirectoryId(u.id),
+      username: u.username,
+      publicAlias: u.publicAlias,
+      role: u.role,
+      status: u.status,
+    })),
+  });
 }
 
 export async function POST(req: Request) {
@@ -38,6 +78,17 @@ export async function POST(req: Request) {
 
   const { username, publicAlias, role, password, tenantId: bodyTenantId } = parsed.data;
   const targetRole = role as Role;
+
+  let passwordToUse = password;
+  /** Returned once when the server generated a temp password for a non–super-admin user. */
+  let generatedTemporaryPassword: string | undefined;
+  if (!isSuperAdmin(targetRole)) {
+    if (!passwordToUse) {
+      passwordToUse = generateTempPassword();
+      generatedTemporaryPassword = passwordToUse;
+    }
+  }
+
   if (!canAssignRole(session.role, targetRole)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
@@ -74,9 +125,11 @@ export async function POST(req: Request) {
   const codeHash = await hashInviteCode(plainInvite);
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
+  const mustChangePassword = Boolean(passwordToUse && !isSuperAdmin(targetRole));
+
   let authUserId: string | null = null;
   let admin: SupabaseClient | null = null;
-  if (password) {
+  if (passwordToUse) {
     try {
       let email: string;
       try {
@@ -85,7 +138,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Invalid username or tenant for sign-in email" }, { status: 400 });
       }
       admin = createServiceRoleClient();
-      authUserId = await upsertAuthPasswordUser(admin, email, password, {
+      authUserId = await upsertAuthPasswordUser(admin, email, passwordToUse, {
         tenant_code: tenantRow.tenantCode,
         username,
       });
@@ -106,6 +159,7 @@ export async function POST(req: Request) {
       authUserId,
       publicAlias,
       role: role as Role,
+      mustChangePassword,
     },
   });
 
@@ -134,7 +188,7 @@ export async function POST(req: Request) {
     entityType: "User",
     entityId: user.id,
     actorId: session.sub,
-    payload: { username, role, hasPassword: Boolean(password) },
+    payload: { username, role, hasPassword: Boolean(passwordToUse) },
   });
   await writeAudit({
     tenantId: targetTenantId,
@@ -149,5 +203,8 @@ export async function POST(req: Request) {
     user: { id: user.id, username, publicAlias, role },
     inviteCode: plainInvite,
     inviteExpiresAt: expiresAt.toISOString(),
+    ...(generatedTemporaryPassword
+      ? { temporaryPassword: generatedTemporaryPassword }
+      : {}),
   });
 }

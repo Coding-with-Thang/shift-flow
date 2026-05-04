@@ -22,7 +22,7 @@ async function linkAuthUser(tenantCode: string, tenantId: string, username: stri
   });
   await prisma.user.update({
     where: { id: row.id },
-    data: { authUserId: authId, passwordHash: null },
+    data: { authUserId: authId, passwordHash: null, mustChangePassword: false },
   });
 }
 
@@ -71,7 +71,7 @@ async function main() {
   });
 
   await prisma.user.upsert({
-    where: { tenantId_username: { tenantId: tenant.id, username: "agent" } },
+    where: { tenantId_username: { tenantId: tenant.id, username: "agent1" } },
     create: {
       tenantId: tenant.id,
       username: "agent1",

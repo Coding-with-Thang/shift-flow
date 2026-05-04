@@ -48,3 +48,11 @@ export async function upsertAuthPasswordUser(
   if (!created.user) throw new Error("Supabase createUser returned no user");
   return created.user.id;
 }
+
+export async function setAuthUserPassword(admin: SupabaseClient, authUserId: string, password: string) {
+  const { error } = await admin.auth.admin.updateUserById(authUserId, {
+    password,
+    email_confirm: true,
+  });
+  if (error) throw error;
+}
