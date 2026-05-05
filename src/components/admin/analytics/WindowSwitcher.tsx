@@ -1,6 +1,10 @@
 "use client";
 
-import { ANALYTICS_WINDOWS, type AnalyticsWindow } from "@/lib/analytics/window";
+import {
+  ANALYTICS_WINDOWS,
+  formatAnalyticsWindowLabel,
+  type AnalyticsWindow,
+} from "@/lib/analytics/window";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -20,7 +24,7 @@ export function WindowSwitcher({ value, onChange, disabled }: Props) {
         const active = w === value;
         return (
           <button
-            key={w}
+            key={String(w)}
             role="tab"
             aria-selected={active}
             disabled={disabled}
@@ -32,7 +36,7 @@ export function WindowSwitcher({ value, onChange, disabled }: Props) {
                 : "text-zinc-600 hover:bg-zinc-50",
             )}
           >
-            {w}d
+            {formatAnalyticsWindowLabel(w)}
           </button>
         );
       })}

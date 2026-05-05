@@ -1,25 +1,40 @@
-import { addDays, startOfDay, subDays } from "date-fns";
+import { addDays, startOfDay, startOfYear, subDays } from "date-fns";
 
-export const ANALYTICS_WINDOWS = [7, 30, 90] as const;
+export const ANALYTICS_WINDOWS = [7, 30, 90, "ytd"] as const;
 export type AnalyticsWindow = (typeof ANALYTICS_WINDOWS)[number];
 
-/** Parse a `window` query-string value to one of 7 / 30 / 90, defaulting to 30. */
+/**
+ * Parse a `window` query param: `7` | `30` | `90` | `ytd` (case-insensitive), default 30.
+ */
 export function parseWindow(raw: string | null | undefined): AnalyticsWindow {
+  if (raw && raw.toLowerCase() === "ytd") return "ytd";
   const n = Number(raw);
   if (n === 7 || n === 30 || n === 90) return n;
   return 30;
 }
 
+/** Short label for controls and KPI subtitles (e.g. "30d", "YTD"). */
+export function formatAnalyticsWindowLabel(w: AnalyticsWindow): string {
+  if (w === "ytd") return "YTD";
+  return `${w}d`;
+}
+
 /**
- * Half-open day range covering the last `window` days INCLUDING today.
- * `start` is the local start-of-day for the first day; `end` is exclusive
- * (the start of tomorrow). Suitable for `createdAt: { gte: start, lt: end }`.
+ * Half-open day range: `[start, end)`.
+ * - Rolling windows: last N calendar days including today (local).
+ * - YTD: Jan 1 (local start of year) through end of today (exclusive end = tomorrow 00:00 local).
  */
 export function getWindowRange(
   window: AnalyticsWindow,
   now: Date = new Date(),
 ): { start: Date; end: Date } {
   const todayStart = startOfDay(now);
+  if (window === "ytd") {
+    return {
+      start: startOfYear(todayStart),
+      end: addDays(todayStart, 1),
+    };
+  }
   const start = subDays(todayStart, window - 1);
   const end = addDays(todayStart, 1);
   return { start, end };

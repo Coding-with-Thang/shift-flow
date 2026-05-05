@@ -15,6 +15,7 @@ import {
 import { canViewAnalytics } from "@/lib/rbac";
 import {
   ANALYTICS_WINDOWS,
+  formatAnalyticsWindowLabel,
   type AnalyticsWindow,
 } from "@/lib/analytics/window";
 import { KpiTile } from "@/components/admin/analytics/KpiTile";
@@ -44,7 +45,7 @@ import type { DeclineReasonKey } from "@/lib/analytics/decline-reasons";
 import type { Role } from "@prisma/client";
 
 type SummaryResponse = {
-  window: number;
+  window: AnalyticsWindow;
   generatedAt: string;
   openNow: { pending: number; claimed: number; total: number };
   windowMetrics: {
@@ -70,7 +71,7 @@ type SummaryResponse = {
 };
 
 type TrendResponse = {
-  window: number;
+  window: AnalyticsWindow;
   volume: {
     day: string;
     created: number;
@@ -92,7 +93,7 @@ type Dim = "site" | "skill" | "hour" | "dow";
 export default function AnalyticsPage() {
   const [role, setRole] = useState<Role | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
-  const [windowDays, setWindowDays] = useState<AnalyticsWindow>(30);
+  const [analyticsWindow, setAnalyticsWindow] = useState<AnalyticsWindow>(30);
 
   const [summary, setSummary] = useState<SummaryResponse | null>(null);
   const [trend, setTrend] = useState<TrendResponse | null>(null);
@@ -215,10 +216,10 @@ export default function AnalyticsPage() {
   useEffect(() => {
     if (!role || !canViewAnalytics(role)) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch helpers update loading flags eagerly; matches existing pattern in PendingShiftsPanel and shift-activities pages.
-    void fetchCore(windowDays);
-    void fetchBreakdown(windowDays, dim);
-    void fetchHeatmap(windowDays);
-  }, [role, windowDays, fetchCore, fetchBreakdown, fetchHeatmap, dim]);
+    void fetchCore(analyticsWindow);
+    void fetchBreakdown(analyticsWindow, dim);
+    void fetchHeatmap(analyticsWindow);
+  }, [role, analyticsWindow, fetchCore, fetchBreakdown, fetchHeatmap, dim]);
 
   if (!sessionReady) {
     return (
@@ -255,7 +256,11 @@ export default function AnalyticsPage() {
             posted across your tenant scope.
           </p>
         </div>
-        <WindowSwitcher value={windowDays} onChange={setWindowDays} disabled={coreLoading} />
+        <WindowSwitcher
+          value={analyticsWindow}
+          onChange={setAnalyticsWindow}
+          disabled={coreLoading}
+        />
       </div>
 
       {error ? (
@@ -267,7 +272,11 @@ export default function AnalyticsPage() {
       {coreLoading || !summary || !trend ? (
         <div className="flex items-center justify-center gap-3 py-24 text-zinc-500">
           <Loader2 className="w-5 h-5 animate-spin" aria-hidden />
-          <span className="text-sm font-medium">Loading analytics for last {windowDays} days…</span>
+          <span className="text-sm font-medium">
+            {analyticsWindow === "ytd"
+              ? "Loading year-to-date analytics…"
+              : `Loading analytics for the last ${analyticsWindow} days…`}
+          </span>
         </div>
       ) : (
         <>
@@ -284,7 +293,7 @@ export default function AnalyticsPage() {
               icon={Inbox}
             />
             <KpiTile
-              label={`Fill rate (${windowDays}d)`}
+              label={`Fill rate (${formatAnalyticsWindowLabel(analyticsWindow)})`}
               value={formatPercent(summary.windowMetrics.fillRate)}
               sub={
                 <>
@@ -297,7 +306,7 @@ export default function AnalyticsPage() {
               sparkline={summary.sparklines.approved}
             />
             <KpiTile
-              label={`Decline rate (${windowDays}d)`}
+              label={`Decline rate (${formatAnalyticsWindowLabel(analyticsWindow)})`}
               value={formatPercent(summary.windowMetrics.declineRate)}
               sub={`${formatNumber(summary.windowMetrics.declined)} declines`}
               icon={XCircle}
@@ -311,7 +320,7 @@ export default function AnalyticsPage() {
               icon={Timer}
             />
             <KpiTile
-              label={`Expired (${windowDays}d)`}
+              label={`Expired (${formatAnalyticsWindowLabel(analyticsWindow)})`}
               value={formatNumber(summary.windowMetrics.expired)}
               sub="Posted but never claimed in time"
               icon={Hourglass}
@@ -319,13 +328,13 @@ export default function AnalyticsPage() {
               sparkline={summary.sparklines.expired}
             />
             <KpiTile
-              label={`Cancelled (${windowDays}d)`}
+              label={`Cancelled (${formatAnalyticsWindowLabel(analyticsWindow)})`}
               value={formatNumber(summary.windowMetrics.cancelled)}
               sub="Withdrawn by the requestor"
               icon={Clock}
             />
             <KpiTile
-              label={`Claims made (${windowDays}d)`}
+              label={`Claims made (${formatAnalyticsWindowLabel(analyticsWindow)})`}
               value={formatNumber(summary.windowMetrics.claimedEvents)}
               sub="Pickups by other agents"
               icon={Activity}
@@ -370,9 +379,12 @@ export default function AnalyticsPage() {
           </section>
 
           <p className="text-[10px] font-medium text-zinc-400 tracking-wider uppercase">
-            Window: last {windowDays} days · Generated{" "}
-            {new Date(summary.generatedAt).toLocaleString()} ·{" "}
-            {ANALYTICS_WINDOWS.map((w) => `${w}d`).join(" / ")} available
+            Window:{" "}
+            {analyticsWindow === "ytd"
+              ? "YTD (Jan 1 – today)"
+              : `last ${analyticsWindow} days`}{" "}
+            · Generated {new Date(summary.generatedAt).toLocaleString()} ·{" "}
+            {ANALYTICS_WINDOWS.map((w) => formatAnalyticsWindowLabel(w)).join(" / ")} available
           </p>
         </>
       )}
