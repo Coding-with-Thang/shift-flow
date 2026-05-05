@@ -37,6 +37,22 @@ export async function DELETE(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const pendingTickets = await prisma.shiftTicket.findMany({
+    where: {
+      tenantId: session.tenantId,
+      requestorId: target.id,
+      status: "PENDING",
+    },
+    orderBy: [{ shiftDate: "asc" }, { startSlot: "asc" }, { id: "asc" }],
+    select: {
+      id: true,
+      shiftDate: true,
+      startSlot: true,
+      endSlot: true,
+      status: true,
+    },
+  });
+
   if (target.authUserId) {
     try {
       const admin = createServiceRoleClient();
@@ -67,9 +83,17 @@ export async function DELETE(
       targetUsername: target.username,
       targetRole: target.role,
       authUserIdDeleted: Boolean(target.authUserId),
+      pendingTicketCount: pendingTickets.length,
+      pendingTickets: pendingTickets.map((t) => ({
+        id: t.id,
+        shiftDate: t.shiftDate.toISOString().slice(0, 10),
+        startSlot: t.startSlot,
+        endSlot: t.endSlot,
+        status: t.status,
+      })),
     },
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, pendingTicketCount: pendingTickets.length });
 }
 
