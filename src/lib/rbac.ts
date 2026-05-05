@@ -27,10 +27,12 @@ export function canProvisionUsers(role: Role) {
 export function canAssignRole(creator: Role, target: Role) {
   if (creator === "SUPER_ADMIN") return true;
   if (creator === "OPS_MANAGER") {
-    return target === "AGENT" || target === "LEADER";
+    return (
+      target === "AGENT" || target === "LEADER" || target === "OPS_MANAGER"
+    );
   }
   if (creator === "LEADER") {
-    return target === "AGENT";
+    return target === "AGENT" || target === "LEADER";
   }
   return false;
 }

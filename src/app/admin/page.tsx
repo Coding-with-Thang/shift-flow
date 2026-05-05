@@ -3,19 +3,10 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
-import {
-  Activity,
-  CheckCircle2,
-  Clock,
-  Loader2,
-  Timer,
-  Users,
-  XCircle,
-  Hourglass,
-  Inbox,
-} from "lucide-react";
-import { KpiTile, type SparklinePoint } from "@/components/admin/analytics/KpiTile";
-import { formatDuration, formatNumber, formatPercent } from "@/components/admin/analytics/formatters";
+import { Activity, Loader2, Timer, Users, Inbox } from "lucide-react";
+import { KpiTile } from "@/components/admin/analytics/KpiTile";
+import { OutcomesSummaryCard } from "@/components/admin/analytics/OutcomesSummaryCard";
+import { formatDuration, formatNumber } from "@/components/admin/analytics/formatters";
 import { canViewAnalytics } from "@/lib/rbac";
 import type { Role } from "@prisma/client";
 
@@ -37,12 +28,6 @@ type SummaryResponse = {
   };
   activeUsers7d: number;
   declineReasons: { key: string; label: string; count: number }[];
-  sparklines: {
-    created: SparklinePoint[];
-    approved: SparklinePoint[];
-    declined: SparklinePoint[];
-    expired: SparklinePoint[];
-  };
 };
 
 type RecentItem = {
@@ -165,34 +150,9 @@ export default function AdminDashboardPage() {
               }
               icon={Inbox}
             />
-            <KpiTile
-              label="Fill rate (30d)"
-              value={formatPercent(summary.windowMetrics.fillRate)}
-              sub={
-                <>
-                  {formatNumber(summary.windowMetrics.approved)} approved of{" "}
-                  {formatNumber(summary.windowMetrics.created)} posted
-                </>
-              }
-              icon={CheckCircle2}
-              tone="positive"
-              sparkline={summary.sparklines.approved}
-            />
-            <KpiTile
-              label="Decline rate (30d)"
-              value={formatPercent(summary.windowMetrics.declineRate)}
-              sub={
-                <>
-                  {formatNumber(summary.windowMetrics.declined)} declines of{" "}
-                  {formatNumber(
-                    summary.windowMetrics.approved + summary.windowMetrics.declined,
-                  )}{" "}
-                  decisions
-                </>
-              }
-              icon={XCircle}
-              tone="negative"
-              sparkline={summary.sparklines.declined}
+            <OutcomesSummaryCard
+              windowMetrics={summary.windowMetrics}
+              className="sm:col-span-2 lg:col-span-2"
             />
             <KpiTile
               label="Median time to decision"
@@ -203,20 +163,6 @@ export default function AdminDashboardPage() {
                 </>
               }
               icon={Timer}
-            />
-            <KpiTile
-              label="Expired (30d)"
-              value={formatNumber(summary.windowMetrics.expired)}
-              sub="Posted but never claimed in time"
-              icon={Hourglass}
-              tone="warning"
-              sparkline={summary.sparklines.expired}
-            />
-            <KpiTile
-              label="Cancelled (30d)"
-              value={formatNumber(summary.windowMetrics.cancelled)}
-              sub="Withdrawn by the requestor"
-              icon={Clock}
             />
             <KpiTile
               label="Claims made (30d)"

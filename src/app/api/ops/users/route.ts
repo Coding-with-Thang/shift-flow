@@ -11,6 +11,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceRoleClient, upsertAuthPasswordUser } from "@/lib/supabase/service-role";
 import { writeAudit } from "@/lib/audit";
 import { generateTempPassword } from "@/lib/auth/temp-password";
+import { listUsersForTenant } from "@/lib/ops/user-directory";
 
 const createSchema = z.object({
   username: z.string().min(2).max(64),
@@ -26,11 +27,6 @@ function randomInvite(): string {
   return randomBytes(12).toString("hex");
 }
 
-function userDirectoryId(userId: string): string {
-  const tail = userId.replace(/[^a-zA-Z0-9]/g, "").slice(-4).toUpperCase();
-  return tail.length >= 4 ? `USR-${tail}` : `USR-${userId.slice(0, 4).toUpperCase()}`;
-}
-
 export async function GET() {
   const session = await requireSession().catch(() => null);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -38,31 +34,9 @@ export async function GET() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const rows = await prisma.user.findMany({
-    where: {
-      tenantId: session.tenantId,
-      username: { not: "_system" },
-    },
-    orderBy: { username: "asc" },
-    select: {
-      id: true,
-      username: true,
-      publicAlias: true,
-      role: true,
-      status: true,
-    },
-  });
+  const users = await listUsersForTenant(session.tenantId);
 
-  return NextResponse.json({
-    users: rows.map((u) => ({
-      id: u.id,
-      directoryId: userDirectoryId(u.id),
-      username: u.username,
-      publicAlias: u.publicAlias,
-      role: u.role,
-      status: u.status,
-    })),
-  });
+  return NextResponse.json({ users });
 }
 
 export async function POST(req: Request) {
