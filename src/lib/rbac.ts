@@ -59,3 +59,22 @@ export function canResetUserPassword(actor: Role, target: Role): boolean {
   if (actor === "OPS_MANAGER") return target === "AGENT" || target === "LEADER";
   return false;
 }
+
+/**
+ * Who may delete a user.
+ *
+ * Notes:
+ * - Leaders may delete agents and leaders.
+ * - Ops managers may delete agents, leaders, and ops managers.
+ * - Super admins may delete any role.
+ */
+export function canDeleteUser(actor: Role, target: Role): boolean {
+  if (actor === "SUPER_ADMIN") return true;
+  if (actor === "OPS_MANAGER") {
+    return target === "AGENT" || target === "LEADER" || target === "OPS_MANAGER";
+  }
+  if (actor === "LEADER") {
+    return target === "AGENT" || target === "LEADER";
+  }
+  return false;
+}

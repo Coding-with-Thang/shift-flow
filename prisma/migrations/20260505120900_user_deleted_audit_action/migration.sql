@@ -1,0 +1,3 @@
+-- Add audit action for user deletion
+ALTER TYPE "AuditAction" ADD VALUE IF NOT EXISTS 'USER_DELETED';
+

@@ -56,3 +56,8 @@ export async function setAuthUserPassword(admin: SupabaseClient, authUserId: str
   });
   if (error) throw error;
 }
+
+export async function deleteAuthUser(admin: SupabaseClient, authUserId: string) {
+  const { error } = await admin.auth.admin.deleteUser(authUserId);
+  if (error) throw error;
+}

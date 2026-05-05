@@ -6,6 +6,7 @@ import type { Role } from "@prisma/client";
 import {
   canAssignRole,
   canProvisionUsers,
+  canDeleteUser,
   canResetUserPassword,
 } from "@/lib/rbac";
 import {
@@ -81,6 +82,10 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
     temporaryPassword: string;
   } | null>(null);
 
+  const [deleteTarget, setDeleteTarget] = useState<DirectoryUser | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   useEffect(() => {
     setMe(initialMe);
     setUsers(initialUsers);
@@ -102,6 +107,12 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
   const showResetFor = useCallback(
     (row: DirectoryUser) =>
       me ? canResetUserPassword(me.role, row.role) && row.id !== me.id : false,
+    [me],
+  );
+
+  const showDeleteFor = useCallback(
+    (row: DirectoryUser) =>
+      me ? canDeleteUser(me.role, row.role) && row.id !== me.id : false,
     [me],
   );
 
@@ -187,6 +198,31 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
       setResetError("Network error.");
     } finally {
       setResetBusy(false);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/ops/users/${encodeURIComponent(deleteTarget.id)}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setDeleteError(
+          typeof data?.error === "string" ? data.error : "Delete failed.",
+        );
+        return;
+      }
+      setDeleteTarget(null);
+      refreshFromServer();
+    } catch {
+      setDeleteError("Network error.");
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
@@ -295,6 +331,18 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
                             className="text-zinc-900 underline-offset-2 hover:underline"
                           >
                             Reset password
+                          </button>
+                        ) : null}
+                        {showDeleteFor(u) ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDeleteError(null);
+                              setDeleteTarget(u);
+                            }}
+                            className="text-red-700 underline-offset-2 hover:underline"
+                          >
+                            Delete
                           </button>
                         ) : null}
                         <span className="text-zinc-300 cursor-not-allowed select-none">
@@ -511,6 +559,50 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
             >
               Close
             </button>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteTarget ? (
+        <div
+          className="fixed inset-0 z-100 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-labelledby="delete-user-title"
+        >
+          <div className="w-full max-w-md rounded-sm border border-zinc-200 bg-white p-6 shadow-xl">
+            <h3
+              id="delete-user-title"
+              className="text-lg font-black tracking-tight text-zinc-900 mb-2"
+            >
+              Delete user
+            </h3>
+            <p className="text-sm text-zinc-600 mb-6">
+              Permanently delete{" "}
+              <span className="font-semibold text-zinc-900">
+                {deleteTarget.publicAlias || deleteTarget.username}
+              </span>{" "}
+              ({deleteTarget.directoryId}). This cannot be undone.
+            </p>
+            {deleteError ? (
+              <p className="text-sm text-red-600 mb-4">{deleteError}</p>
+            ) : null}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                className="flex-1 border border-zinc-200 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-zinc-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmDelete()}
+                disabled={deleteBusy}
+                className="flex-1 bg-red-700 text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-red-800 disabled:opacity-50"
+              >
+                {deleteBusy ? "Working…" : "Confirm delete"}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
