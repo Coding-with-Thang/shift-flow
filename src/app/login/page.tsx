@@ -9,7 +9,7 @@ import { Footer } from "@/components/Footer";
 export default function LoginPage() {
   const router = useRouter();
   const [tenantCode, setTenantCode] = useState("demo");
-  const [username, setUsername] = useState("");
+  const [userId, setUserId] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -22,7 +22,7 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tenantCode, username, password }),
+        body: JSON.stringify({ tenantCode, userId, password }),
         credentials: "include",
       });
       const data = await res.json().catch(() => ({}));
@@ -85,7 +85,7 @@ export default function LoginPage() {
 
           <div>
             <label className="block text-[10px] font-bold tracking-widest text-zinc-800 mb-2 uppercase">
-              Username / ID
+              User ID
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -93,12 +93,15 @@ export default function LoginPage() {
               </div>
               <input
                 className="block w-full pl-10 pr-3 py-3 bg-[#F0F0F0] border-0 text-sm focus:ring-1 focus:ring-black outline-none transition-shadow font-medium text-zinc-800"
-                placeholder="Enter your username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter your user id"
+                value={userId}
+                onChange={(e) => setUserId(e.target.value)}
                 autoComplete="username"
               />
             </div>
+            <p className="mt-2 text-[11px] text-zinc-500 font-medium leading-snug">
+              Use the User ID your administrator assigned (same value as your login name for this tenant).
+            </p>
           </div>
 
           <div>

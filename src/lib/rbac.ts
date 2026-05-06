@@ -78,3 +78,20 @@ export function canDeleteUser(actor: Role, target: Role): boolean {
   }
   return false;
 }
+
+/** Leaders, ops managers, and super admins may edit agent public aliases. */
+export function canEditAgentAlias(actor: Role, target: Role): boolean {
+  if (target !== "AGENT") return false;
+  return actor === "LEADER" || actor === "OPS_MANAGER" || actor === "SUPER_ADMIN";
+}
+
+/** Ops managers and super admins may edit leader public aliases. */
+export function canEditLeaderAlias(actor: Role, target: Role): boolean {
+  if (target !== "LEADER") return false;
+  return actor === "OPS_MANAGER" || actor === "SUPER_ADMIN";
+}
+
+/** Leaders and ops managers may edit their own alias (and super admins too). */
+export function canEditOwnAlias(role: Role): boolean {
+  return role === "LEADER" || role === "OPS_MANAGER" || role === "SUPER_ADMIN";
+}

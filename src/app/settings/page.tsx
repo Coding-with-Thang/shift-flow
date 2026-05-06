@@ -62,7 +62,7 @@ export default function UserSettingsPage() {
                   <div className="flex-1">
                     <h2 className="text-xl font-bold text-black mb-2">Password</h2>
                     <p className="text-zinc-500 text-sm mb-6">
-                      Update the password you use to sign in with your tenant code and username.
+                      Update the password you use to sign in with your tenant code and User ID.
                     </p>
                     <Link
                       href="/account/change-password"

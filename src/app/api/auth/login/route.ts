@@ -6,8 +6,9 @@ import { writeAudit } from "@/lib/audit";
 import { createClient } from "@/lib/server";
 
 const bodySchema = z.object({
-  tenantCode: z.string().min(1),
-  username: z.string().min(1),
+  tenantCode: z.string().min(1).transform((s) => s.trim()),
+  /** Login User ID — matches `User.username` for the tenant. */
+  userId: z.string().min(1).transform((s) => s.trim()),
   password: z.string().min(8),
 });
 
@@ -17,15 +18,18 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
-  const { tenantCode, username, password } = parsed.data;
+  const { tenantCode, userId, password } = parsed.data;
 
   const tenant = await prisma.tenant.findUnique({ where: { tenantCode } });
   if (!tenant) {
     return NextResponse.json({ error: "Invalid tenant or credentials" }, { status: 401 });
   }
 
+  const loginUsername = userId;
   const user = await prisma.user.findUnique({
-    where: { tenantId_username: { tenantId: tenant.id, username } },
+    where: {
+      tenantId_username: { tenantId: tenant.id, username: loginUsername },
+    },
   });
   if (!user || user.status !== "ACTIVE") {
     return NextResponse.json({ error: "Invalid tenant or credentials" }, { status: 401 });
@@ -43,7 +47,8 @@ export async function POST(req: Request) {
 
   let email: string;
   try {
-    email = loginEmailForTenantUser(tenant.tenantCode, username);
+    // Login identifier is `User.id`, but Auth email is still derived from tenant + username.
+    email = loginEmailForTenantUser(tenant.tenantCode, user.username);
   } catch {
     return NextResponse.json({ error: "Invalid tenant or credentials" }, { status: 401 });
   }
@@ -60,7 +65,7 @@ export async function POST(req: Request) {
     entityType: "User",
     entityId: user.id,
     actorId: user.id,
-    payload: { username: user.username },
+    payload: { prismaUserId: user.id, loginUserId: user.username },
   });
 
   return NextResponse.json({

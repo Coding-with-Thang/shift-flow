@@ -7,6 +7,9 @@ import {
   canAssignRole,
   canProvisionUsers,
   canDeleteUser,
+  canEditAgentAlias,
+  canEditLeaderAlias,
+  canEditOwnAlias,
   canResetUserPassword,
 } from "@/lib/rbac";
 import {
@@ -86,6 +89,11 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  const [aliasTarget, setAliasTarget] = useState<DirectoryUser | null>(null);
+  const [aliasValue, setAliasValue] = useState("");
+  const [aliasBusy, setAliasBusy] = useState(false);
+  const [aliasError, setAliasError] = useState<string | null>(null);
+
   useEffect(() => {
     setMe(initialMe);
     setUsers(initialUsers);
@@ -113,6 +121,15 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
   const showDeleteFor = useCallback(
     (row: DirectoryUser) =>
       me ? canDeleteUser(me.role, row.role) && row.id !== me.id : false,
+    [me],
+  );
+
+  const showEditAliasFor = useCallback(
+    (row: DirectoryUser) => {
+      if (!me) return false;
+      if (row.id === me.id) return canEditOwnAlias(me.role);
+      return canEditAgentAlias(me.role, row.role) || canEditLeaderAlias(me.role, row.role);
+    },
     [me],
   );
 
@@ -226,6 +243,34 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
     }
   }
 
+  async function confirmAliasUpdate() {
+    if (!aliasTarget) return;
+    setAliasBusy(true);
+    setAliasError(null);
+    try {
+      const res = await fetch(`/api/ops/users/${encodeURIComponent(aliasTarget.id)}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ publicAlias: aliasValue }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAliasError(
+          typeof data?.error === "string" ? data.error : "Update failed.",
+        );
+        return;
+      }
+      setAliasTarget(null);
+      setAliasValue("");
+      refreshFromServer();
+    } catch {
+      setAliasError("Network error.");
+    } finally {
+      setAliasBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-10 max-w-[1100px]">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -234,7 +279,9 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
             User Management
           </h1>
           <p className="text-zinc-500 font-medium text-lg max-w-xl">
-            Directory of all authorized system operators and access tiers.
+            Each person signs in with a tenant code and <strong className="font-semibold text-zinc-700">User ID</strong>
+            . Agents use a peer-facing <strong className="font-semibold text-zinc-700">alias</strong> in the marketplace;
+            leaders and operations match alias to User ID here for scheduling.
           </p>
         </div>
         {canCreateUser ? (
@@ -267,7 +314,7 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
           <AdminTableTable>
             <AdminTableThead>
               <AdminTableHeaderRow>
-                <AdminTableHeaderCell density="comfortable">User ID</AdminTableHeaderCell>
+                <AdminTableHeaderCell density="comfortable">User ID · alias</AdminTableHeaderCell>
                 <AdminTableHeaderCell density="comfortable">Role</AdminTableHeaderCell>
                 <AdminTableHeaderCell density="comfortable">Status</AdminTableHeaderCell>
                 <AdminTableHeaderCell density="comfortable" className="text-right">
@@ -290,12 +337,14 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
                 users.map((u) => (
                   <AdminTableRow key={u.id} className="hover:bg-zinc-50/60">
                     <AdminTableCell density="comfortable">
-                      <div className="font-mono text-xs font-semibold text-zinc-900">
-                        {u.directoryId}
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                        User ID
                       </div>
-                      <div className="text-[11px] text-zinc-500 mt-0.5">
-                        {u.publicAlias || u.username}
+                      <div className="font-mono text-xs font-semibold text-zinc-900">{u.username}</div>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mt-2">
+                        Alias
                       </div>
+                      <div className="text-[11px] text-zinc-600">{u.publicAlias}</div>
                     </AdminTableCell>
                     <AdminTableCell density="comfortable" className="text-zinc-800 font-medium">
                       {roleLabel(u.role)}
@@ -345,9 +394,23 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
                             Delete
                           </button>
                         ) : null}
-                        <span className="text-zinc-300 cursor-not-allowed select-none">
-                          Edit
-                        </span>
+                        {showEditAliasFor(u) ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAliasError(null);
+                              setAliasTarget(u);
+                              setAliasValue(u.publicAlias || u.username);
+                            }}
+                            className="text-zinc-700 underline-offset-2 hover:underline"
+                          >
+                            Edit alias
+                          </button>
+                        ) : (
+                          <span className="text-zinc-300 cursor-not-allowed select-none">
+                            Edit
+                          </span>
+                        )}
                       </div>
                     </AdminTableCell>
                   </AdminTableRow>
@@ -372,14 +435,14 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
               Create user
             </h3>
             <p className="text-xs text-zinc-500 mb-6">
-              Add a team member with their role. They receive a one-time invite
-              code (and a temporary password when applicable) for first sign-in.
+              Assign a <strong className="font-semibold text-zinc-700">User ID</strong> they will type at login (with tenant code),
+              plus an alias shown to other agents. Invite code and temp password are returned once.
             </p>
 
             {createUserResult ? (
               <div className="space-y-4">
                 <p className="text-sm text-zinc-700">
-                  User{" "}
+                  User ID{" "}
                   <span className="font-semibold">{createUserResult.username}</span>{" "}
                   created. Copy the details below; they will not be shown again.
                 </p>
@@ -425,8 +488,11 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
                 ) : null}
                 <div>
                   <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">
-                    Username
+                    User ID
                   </label>
+                  <p className="text-[11px] text-zinc-500 mb-1.5">
+                    Unique within your tenant; used at login with tenant code.
+                  </p>
                   <input
                     required
                     value={newUser.username}
@@ -438,8 +504,11 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">
-                    Public alias
+                    Peer-facing alias
                   </label>
+                  <p className="text-[11px] text-zinc-500 mb-1.5">
+                    Shown to other agents; leaders and ops still see User ID here for scheduling.
+                  </p>
                   <input
                     required
                     value={newUser.publicAlias}
@@ -504,12 +573,11 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
               Reset password
             </h3>
             <p className="text-sm text-zinc-600 mb-6">
-              Issue a temporary password for{" "}
-              <span className="font-semibold text-zinc-900">
-                {resetTarget.publicAlias || resetTarget.username}
-              </span>{" "}
-              ({resetTarget.directoryId}). This action is recorded in the audit
-              log.
+              Issue a temporary password for alias{" "}
+              <span className="font-semibold text-zinc-900">{resetTarget.publicAlias}</span>
+              {" "}(User ID{" "}
+              <span className="font-mono font-semibold text-zinc-900">{resetTarget.username}</span>
+              ). This action is recorded in the audit log.
             </p>
             {resetError ? (
               <p className="text-sm text-red-600 mb-4">{resetError}</p>
@@ -577,11 +645,11 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
               Delete user
             </h3>
             <p className="text-sm text-zinc-600 mb-6">
-              Permanently delete{" "}
-              <span className="font-semibold text-zinc-900">
-                {deleteTarget.publicAlias || deleteTarget.username}
-              </span>{" "}
-              ({deleteTarget.directoryId}). This cannot be undone.
+              Permanently delete alias{" "}
+              <span className="font-semibold text-zinc-900">{deleteTarget.publicAlias}</span>
+              {" "}(User ID{" "}
+              <span className="font-mono font-semibold text-zinc-900">{deleteTarget.username}</span>
+              ). This cannot be undone.
             </p>
             {deleteError ? (
               <p className="text-sm text-red-600 mb-4">{deleteError}</p>
@@ -601,6 +669,60 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
                 className="flex-1 bg-red-700 text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-red-800 disabled:opacity-50"
               >
                 {deleteBusy ? "Working…" : "Confirm delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {aliasTarget ? (
+        <div
+          className="fixed inset-0 z-100 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-labelledby="edit-alias-title"
+        >
+          <div className="w-full max-w-md rounded-sm border border-zinc-200 bg-white p-6 shadow-xl">
+            <h3
+              id="edit-alias-title"
+              className="text-lg font-black tracking-tight text-zinc-900 mb-2"
+            >
+              Edit peer-facing alias
+            </h3>
+            <p className="text-xs text-zinc-500 mb-4">
+              User ID{" "}
+              <span className="font-mono font-semibold text-zinc-800">{aliasTarget.username}</span>
+              {" "}does not change. Other agents see the alias below.
+            </p>
+            {aliasError ? (
+              <p className="text-sm text-red-600 mb-4">{aliasError}</p>
+            ) : null}
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">
+              Alias
+            </label>
+            <input
+              required
+              value={aliasValue}
+              onChange={(e) => setAliasValue(e.target.value)}
+              className="w-full border border-zinc-200 px-3 py-2 text-sm focus:outline-none focus:border-black mb-6"
+            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setAliasTarget(null);
+                  setAliasValue("");
+                }}
+                className="flex-1 border border-zinc-200 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-zinc-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmAliasUpdate()}
+                disabled={aliasBusy}
+                className="flex-1 bg-black text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-zinc-800 disabled:opacity-50"
+              >
+                {aliasBusy ? "Saving…" : "Save"}
               </button>
             </div>
           </div>

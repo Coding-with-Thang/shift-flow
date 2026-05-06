@@ -1,4 +1,4 @@
-/** Synthetic email for Supabase Auth; stable per tenant + username. */
+/** Synthetic email for Supabase Auth; stable per tenant + user login id (`User.username`). */
 const DEFAULT_DOMAIN = "scheduler.local";
 
 /** Normalizes a tenant code for storage and sign-in (lowercase slug). */

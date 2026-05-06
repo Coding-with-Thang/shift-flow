@@ -41,6 +41,7 @@ enum AuditAction {
   TICKET_EXPIRED
   USER_CREATED
   USER_DELETED
+  USER_ALIAS_UPDATED
   INVITE_ISSUED
   LOGIN_SUCCESS
   LOGOUT
@@ -70,14 +71,14 @@ model User {
   id           String     @id @default(cuid())
   tenantId     String
   tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  /// Login name; unique per tenant
+  /// Login User ID; unique per tenant (sign-in identifier together with tenant code).
   username     String
   /// Supabase Auth user id (`auth.users.id`); null until linked (e.g. invite-only user before registration).
   authUserId   String?    @unique @db.Uuid
   /// Legacy bcrypt hash; unused when `authUserId` is set (password lives in Supabase Auth).
   passwordHash String?
   role         Role
-  /// Shown to other agents (aliases-only peer view)
+  /// Peer-facing alias (especially agents); leaders/ops use username + alias for back-office.
   publicAlias  String
   status       UserStatus @default(ACTIVE)
   /// True when the user must set their own password (e.g. initial temp password for non–super-admin accounts).
