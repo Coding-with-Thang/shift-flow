@@ -7,6 +7,7 @@ import { assertValidSlotRange, formatSlot } from "@/lib/slots";
 import { canApprove } from "@/lib/rbac";
 import { serializeTicketPublic } from "@/lib/tickets/serialize";
 import { resolveTenantListScope } from "@/lib/tenant-scope";
+import type { ShiftTicketKind } from "@prisma/client";
 
 const createSchema = z.object({
   shiftDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -14,6 +15,7 @@ const createSchema = z.object({
   endSlot: z.number().int().min(1).max(96),
   siteTeam: z.string().optional(),
   skillTag: z.string().optional(),
+  kind: z.enum(["GIVEAWAY", "REQUEST"]).optional(),
 });
 
 export async function GET(req: Request) {
@@ -38,6 +40,7 @@ export async function GET(req: Request) {
     const rows = await prisma.shiftTicket.findMany({
       where: {
         ...tenantFilter,
+        kind: "GIVEAWAY",
         status: "PENDING",
       },
       orderBy: [{ shiftDate: "asc" }, { startSlot: "asc" }],
@@ -53,7 +56,16 @@ export async function GET(req: Request) {
 
   if (view === "mine") {
     const rows = await prisma.shiftTicket.findMany({
-      where: { ...tenantFilter, requestorId: session.sub },
+      where: { ...tenantFilter, requestorId: session.sub, kind: "GIVEAWAY" },
+      orderBy: { shiftDate: "desc" },
+      include: baseInclude,
+    });
+    return NextResponse.json({ tickets: rows.map(serializeTicketPublic) });
+  }
+
+  if (view === "my-requests") {
+    const rows = await prisma.shiftTicket.findMany({
+      where: { ...tenantFilter, requestorId: session.sub, kind: "REQUEST" },
       orderBy: { shiftDate: "desc" },
       include: baseInclude,
     });
@@ -74,7 +86,19 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     const rows = await prisma.shiftTicket.findMany({
-      where: { ...tenantFilter, status: "CLAIMED" },
+      where: { ...tenantFilter, kind: "GIVEAWAY", status: "CLAIMED" },
+      orderBy: { createdAt: "asc" },
+      include: baseInclude,
+    });
+    return NextResponse.json({ tickets: rows.map(serializeTicketPublic) });
+  }
+
+  if (view === "request-approvals") {
+    if (!canApprove(session.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    const rows = await prisma.shiftTicket.findMany({
+      where: { ...tenantFilter, kind: "REQUEST", status: "PENDING" },
       orderBy: { createdAt: "asc" },
       include: baseInclude,
     });
@@ -84,17 +108,17 @@ export async function GET(req: Request) {
   if (view === "dashboard") {
     const [available, mine, claimed] = await Promise.all([
       prisma.shiftTicket.findMany({
-        where: { ...tenantFilter, status: "PENDING" },
+        where: { ...tenantFilter, kind: "GIVEAWAY", status: "PENDING" },
         orderBy: [{ shiftDate: "asc" }, { startSlot: "asc" }],
         include: baseInclude,
       }),
       prisma.shiftTicket.findMany({
-        where: { ...tenantFilter, requestorId: session.sub },
+        where: { ...tenantFilter, requestorId: session.sub, kind: "GIVEAWAY" },
         orderBy: { shiftDate: "desc" },
         include: baseInclude,
       }),
       prisma.shiftTicket.findMany({
-        where: { ...tenantFilter, claimerId: session.sub },
+        where: { ...tenantFilter, claimerId: session.sub, kind: "GIVEAWAY" },
         orderBy: { shiftDate: "desc" },
         include: baseInclude,
       }),
@@ -117,7 +141,7 @@ export async function POST(req: Request) {
   const session = await requireSession().catch(() => null);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (session.role !== "AGENT") {
-    return NextResponse.json({ error: "Only agents can post shift tickets" }, { status: 403 });
+    return NextResponse.json({ error: "Only agents can create shift tickets" }, { status: 403 });
   }
 
   const json = await req.json().catch(() => null);
@@ -126,6 +150,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid body", details: parsed.error.flatten() }, { status: 400 });
   }
   const { shiftDate, startSlot, endSlot, siteTeam, skillTag } = parsed.data;
+  const kind: ShiftTicketKind = (parsed.data.kind ?? "GIVEAWAY") as ShiftTicketKind;
   try {
     assertValidSlotRange(startSlot, endSlot);
     
@@ -161,6 +186,7 @@ export async function POST(req: Request) {
       endSlot,
       siteTeam,
       skillTag,
+      kind,
       status: "PENDING",
     },
     include: {

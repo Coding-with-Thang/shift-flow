@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import type { TicketStatus } from "@prisma/client";
+import { toZonedTime } from "date-fns-tz";
 import { prisma } from "@/lib/db";
+import { APP_TIMEZONE } from "@/lib/constants";
 import { requireSession } from "@/lib/auth/session";
 import { canViewAnalytics } from "@/lib/rbac";
 import { resolveTenantListScope } from "@/lib/tenant-scope";
@@ -26,6 +28,10 @@ type BreakdownBucket = {
   cancelled: number;
   pending: number;
   claimed: number;
+  /** Hour-of-week heatmap: tickets created in this wall-clock slot (APP_TIMEZONE). */
+  posted: number;
+  /** Hour-of-week heatmap: TICKET_CLAIMED audit events in this wall-clock slot. */
+  claims: number;
   fillRate: number | null;
   hour?: number;
   dow?: number;
@@ -46,9 +52,16 @@ function emptyBucket(
     cancelled: 0,
     pending: 0,
     claimed: 0,
+    posted: 0,
+    claims: 0,
     fillRate: null,
     ...(extras ?? {}),
   };
+}
+
+function dowHourInAppTimezone(d: Date): { dow: number; hour: number } {
+  const z = toZonedTime(d, APP_TIMEZONE);
+  return { dow: z.getDay(), hour: z.getHours() };
 }
 
 function applyStatus(bucket: BreakdownBucket, status: TicketStatus, n: number) {
@@ -123,6 +136,43 @@ export async function GET(req: Request) {
     return NextResponse.json({ dim, window, buckets: out });
   }
 
+  if (dim === "hour-dow") {
+    const [postedTickets, claimEvents] = await Promise.all([
+      prisma.shiftTicket.findMany({
+        where: { ...tenantFilter, createdAt: { gte: windowStart, lt: windowEnd } },
+        select: { createdAt: true },
+      }),
+      prisma.auditEvent.findMany({
+        where: {
+          ...tenantFilter,
+          action: "TICKET_CLAIMED",
+          createdAt: { gte: windowStart, lt: windowEnd },
+        },
+        select: { createdAt: true },
+      }),
+    ]);
+
+    const buckets = new Map<string, BreakdownBucket>();
+    for (let d = 0; d < 7; d++) {
+      for (let h = 0; h < 24; h++) {
+        const key = `${d}-${h}`;
+        buckets.set(key, emptyBucket(key, `${DOW_LABELS[d]} ${HOUR_LABELS[h]}`, { hour: h, dow: d }));
+      }
+    }
+    for (const t of postedTickets) {
+      const { dow, hour } = dowHourInAppTimezone(t.createdAt);
+      const cur = buckets.get(`${dow}-${hour}`)!;
+      cur.posted += 1;
+    }
+    for (const e of claimEvents) {
+      const { dow, hour } = dowHourInAppTimezone(e.createdAt);
+      const cur = buckets.get(`${dow}-${hour}`)!;
+      cur.claims += 1;
+    }
+    const out = finalize(buckets);
+    return NextResponse.json({ dim, window, buckets: out });
+  }
+
   const tickets = await prisma.shiftTicket.findMany({
     where: { ...tenantFilter, createdAt: { gte: windowStart, lt: windowEnd } },
     select: { status: true, startSlot: true, shiftDate: true },
@@ -157,19 +207,5 @@ export async function GET(req: Request) {
     return NextResponse.json({ dim, window, buckets: out });
   }
 
-  const buckets = new Map<string, BreakdownBucket>();
-  for (let d = 0; d < 7; d++) {
-    for (let h = 0; h < 24; h++) {
-      const key = `${d}-${h}`;
-      buckets.set(key, emptyBucket(key, `${DOW_LABELS[d]} ${HOUR_LABELS[h]}`, { hour: h, dow: d }));
-    }
-  }
-  for (const t of tickets) {
-    const dow = t.shiftDate.getUTCDay();
-    const hour = Math.max(0, Math.min(23, Math.floor(t.startSlot / 4)));
-    const cur = buckets.get(`${dow}-${hour}`)!;
-    applyStatus(cur, t.status, 1);
-  }
-  const out = finalize(buckets);
-  return NextResponse.json({ dim, window, buckets: out });
+  return NextResponse.json({ dim, window, buckets: [] satisfies BreakdownBucket[] }, { status: 400 });
 }

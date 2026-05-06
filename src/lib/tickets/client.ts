@@ -6,6 +6,7 @@ export type PublicTicketJson = {
   endSlot: number;
   siteTeam: string | null;
   skillTag: string | null;
+  kind: "GIVEAWAY" | "REQUEST";
   status: string;
   requestorAlias: string;
   claimerAlias: string | null;
@@ -24,6 +25,7 @@ export async function createShiftTicket(body: {
   endSlot: number;
   siteTeam?: string;
   skillTag?: string;
+  kind?: PublicTicketJson["kind"];
 }) {
   const res = await fetch("/api/tickets", {
     method: "POST",

@@ -35,8 +35,20 @@ export async function POST(req: Request, ctx: Params) {
     where: isSuperAdmin(session.role) ? { id } : { id, tenantId: session.tenantId },
   });
   if (!ticket) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (ticket.status !== "CLAIMED") {
-    return NextResponse.json({ error: "Ticket is not awaiting approval" }, { status: 400 });
+  if (ticket.kind === "GIVEAWAY") {
+    if (ticket.status !== "CLAIMED") {
+      return NextResponse.json(
+        { error: "Ticket is not awaiting approval" },
+        { status: 400 },
+      );
+    }
+  } else {
+    if (ticket.status !== "PENDING") {
+      return NextResponse.json(
+        { error: "Ticket is not awaiting approval" },
+        { status: 400 },
+      );
+    }
   }
 
   const updated = await prisma.shiftTicket.update({

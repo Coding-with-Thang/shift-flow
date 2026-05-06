@@ -9,6 +9,7 @@ import {
   Users,
   Activity,
   BarChart3,
+  ClipboardList,
   ShieldCheck,
   Settings,
   HelpCircle,
@@ -21,6 +22,7 @@ import type { Role } from "@prisma/client";
 const baseMenuItems = [
   { name: "Overview", icon: LayoutDashboard, href: "/admin" },
   { name: "Pending Shifts", icon: Clock, href: "/admin/pending-shifts" },
+  { name: "Hour Requests", icon: ClipboardList, href: "/admin/hour-requests" },
   { name: "Users", icon: Users, href: "/admin/users" },
   { name: "Shift Activities", icon: Activity, href: "/admin/shift-activities" },
 ] as const;

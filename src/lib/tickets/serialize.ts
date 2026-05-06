@@ -16,6 +16,7 @@ export function serializeTicketPublic(t: TicketWithUsers) {
     endSlot: t.endSlot,
     siteTeam: t.siteTeam,
     skillTag: t.skillTag,
+    kind: t.kind,
     status: t.status,
     requestorAlias: peerAlias(t.requestor),
     claimerAlias: t.claimer ? peerAlias(t.claimer) : null,

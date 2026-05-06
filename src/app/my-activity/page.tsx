@@ -18,6 +18,7 @@ import { useUserPreferencesStore } from "@/store/useUserPreferencesStore";
 import { formatSlotRange } from "@/lib/slots";
 import { cn } from "@/lib/utils";
 import { cancelShiftTicket, type PublicTicketJson } from "@/lib/tickets/client";
+import { PostShiftModal } from "@/components/PostShiftModal";
 import { isAgent } from "@/lib/rbac";
 import type { Role } from "@prisma/client";
 
@@ -106,9 +107,11 @@ export default function MyActivityPage() {
 
   const [givenAway, setGivenAway] = useState<PublicTicketJson[]>([]);
   const [taken, setTaken] = useState<PublicTicketJson[]>([]);
+  const [requested, setRequested] = useState<PublicTicketJson[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<Role | null>(null);
+  const [requestModalOpen, setRequestModalOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -126,9 +129,10 @@ export default function MyActivityPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [gRes, tRes] = await Promise.all([
+      const [gRes, tRes, rRes] = await Promise.all([
         fetch("/api/tickets?view=mine"),
         fetch("/api/tickets?view=claimed"),
+        fetch("/api/tickets?view=my-requests"),
       ]);
       if (gRes.ok) {
         const g = (await gRes.json()) as { tickets?: PublicTicketJson[] };
@@ -141,6 +145,12 @@ export default function MyActivityPage() {
         setTaken(t.tickets ?? []);
       } else {
         setTaken([]);
+      }
+      if (rRes.ok) {
+        const r = (await rRes.json()) as { tickets?: PublicTicketJson[] };
+        setRequested(r.tickets ?? []);
+      } else {
+        setRequested([]);
       }
     } finally {
       setLoading(false);
@@ -186,12 +196,21 @@ export default function MyActivityPage() {
               </div>
               <div className="flex gap-3">
                 {userRole !== null && isAgent(userRole) ? (
-                  <Link
-                    href="/marketplace"
-                    className="bg-black text-white px-6 py-2.5 text-[11px] font-bold tracking-widest uppercase hover:bg-zinc-800 transition-colors rounded-sm inline-block text-center"
-                  >
-                    Post Shift
-                  </Link>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setRequestModalOpen(true)}
+                      className="bg-white text-black border border-zinc-200 px-6 py-2.5 text-[11px] font-bold tracking-widest uppercase hover:bg-zinc-50 hover:border-zinc-300 transition-colors rounded-sm inline-block text-center"
+                    >
+                      Request Hours
+                    </button>
+                    <Link
+                      href="/marketplace"
+                      className="bg-black text-white px-6 py-2.5 text-[11px] font-bold tracking-widest uppercase hover:bg-zinc-800 transition-colors rounded-sm inline-block text-center"
+                    >
+                      Post Shift
+                    </Link>
+                  </>
                 ) : null}
               </div>
             </div>
@@ -381,9 +400,72 @@ export default function MyActivityPage() {
                 </div>
               </div>
             </div>
+
+            <div className="mt-12">
+              <div className="flex items-center justify-between border-b border-black pb-3">
+                <h2 className="text-[11px] font-bold tracking-widest uppercase text-black">
+                  Hours I&apos;ve Requested
+                </h2>
+                <span className="text-[11px] text-zinc-500">
+                  {loading ? "…" : `${requested.length} total records`}
+                </span>
+              </div>
+              <div className="flex flex-col gap-4 mt-6">
+                {loading ? (
+                  <p className="text-sm text-zinc-500">Loading…</p>
+                ) : requested.length === 0 ? (
+                  <p className="text-sm text-zinc-500">No hour requests yet.</p>
+                ) : (
+                  requested.map((t) => {
+                    const badge = givenAwayBadge(t.status);
+                    return (
+                      <div
+                        key={t.id}
+                        className="border border-zinc-200 p-5 rounded-sm flex justify-between items-start bg-white"
+                      >
+                        <div className="flex flex-col gap-2 w-full">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-xs font-mono text-black break-all">
+                              {t.id}
+                            </span>
+                            <div
+                              className={cn(
+                                "flex items-center gap-1.5 px-2.5 py-1 text-[9px] font-bold tracking-widest uppercase rounded-sm",
+                                badge.variant === "approved" && "bg-black text-white",
+                                badge.variant === "pending" &&
+                                  "border border-zinc-300 text-black",
+                                badge.variant === "muted" && "bg-zinc-200 text-zinc-500",
+                                badge.variant === "danger" &&
+                                  "border border-red-200 text-red-700 bg-red-50",
+                              )}
+                            >
+                              <span>{badge.label}</span>
+                            </div>
+                          </div>
+                          <div className="text-xs font-medium text-black">
+                            {formatShiftDayLabel(t.shiftDate)} •{" "}
+                            {formatTime(t.startSlot, t.endSlot)}
+                          </div>
+                          <div className="text-[11px] text-zinc-400">
+                            {givenAwayFooter(t)}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </main>
+
+      <PostShiftModal
+        isOpen={requestModalOpen}
+        onClose={() => setRequestModalOpen(false)}
+        onSuccess={() => load()}
+        kind="REQUEST"
+      />
     </div>
   );
 }

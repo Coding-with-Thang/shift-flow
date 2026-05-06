@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+} from "react";
 import { useRouter } from "next/navigation";
 import type { Role } from "@prisma/client";
 import {
@@ -135,7 +141,10 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
     (row: DirectoryUser) => {
       if (!me) return false;
       if (row.id === me.id) return canEditOwnAlias(me.role);
-      return canEditAgentAlias(me.role, row.role) || canEditLeaderAlias(me.role, row.role);
+      return (
+        canEditAgentAlias(me.role, row.role) ||
+        canEditLeaderAlias(me.role, row.role)
+      );
     },
     [me],
   );
@@ -239,10 +248,13 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
     setDeleteBusy(true);
     setDeleteError(null);
     try {
-      const res = await fetch(`/api/ops/users/${encodeURIComponent(deleteTarget.id)}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
+      const res = await fetch(
+        `/api/ops/users/${encodeURIComponent(deleteTarget.id)}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+        },
+      );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setDeleteError(
@@ -264,12 +276,15 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
     setAliasBusy(true);
     setAliasError(null);
     try {
-      const res = await fetch(`/api/ops/users/${encodeURIComponent(aliasTarget.id)}`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ publicAlias: aliasValue }),
-      });
+      const res = await fetch(
+        `/api/ops/users/${encodeURIComponent(aliasTarget.id)}`,
+        {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ publicAlias: aliasValue }),
+        },
+      );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setAliasError(
@@ -297,12 +312,15 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
     setUserIdBusy(true);
     setUserIdError(null);
     try {
-      const res = await fetch(`/api/ops/users/${encodeURIComponent(userIdTarget.id)}`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: next }),
-      });
+      const res = await fetch(
+        `/api/ops/users/${encodeURIComponent(userIdTarget.id)}`,
+        {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: next }),
+        },
+      );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setUserIdError(
@@ -328,9 +346,12 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
             User Management
           </h1>
           <p className="text-zinc-500 font-medium text-lg max-w-xl">
-            Each person signs in with a tenant code and <strong className="font-semibold text-zinc-700">User ID</strong>
-            . Agents use a peer-facing <strong className="font-semibold text-zinc-700">alias</strong> in the marketplace;
-            leaders and operations match alias to User ID here for scheduling.
+            Each person signs in with a tenant code and{" "}
+            <strong className="font-semibold text-zinc-700">User ID</strong>.
+            Agents use a peer-facing{" "}
+            <strong className="font-semibold text-zinc-700">alias</strong> in
+            the marketplace; leaders and operations match alias to User ID here
+            for scheduling updates.
           </p>
         </div>
         {canCreateUser ? (
@@ -363,10 +384,19 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
           <AdminTableTable>
             <AdminTableThead>
               <AdminTableHeaderRow>
-                <AdminTableHeaderCell density="comfortable">User ID · alias</AdminTableHeaderCell>
-                <AdminTableHeaderCell density="comfortable">Role</AdminTableHeaderCell>
-                <AdminTableHeaderCell density="comfortable">Status</AdminTableHeaderCell>
-                <AdminTableHeaderCell density="comfortable" className="text-right">
+                <AdminTableHeaderCell density="comfortable">
+                  User ID · alias
+                </AdminTableHeaderCell>
+                <AdminTableHeaderCell density="comfortable">
+                  Role
+                </AdminTableHeaderCell>
+                <AdminTableHeaderCell density="comfortable">
+                  Status
+                </AdminTableHeaderCell>
+                <AdminTableHeaderCell
+                  density="comfortable"
+                  className="text-right"
+                >
                   Actions
                 </AdminTableHeaderCell>
               </AdminTableHeaderRow>
@@ -389,13 +419,20 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
                       <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
                         User ID
                       </div>
-                      <div className="font-mono text-xs font-semibold text-zinc-900">{u.username}</div>
+                      <div className="font-mono text-xs font-semibold text-zinc-900">
+                        {u.username}
+                      </div>
                       <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mt-2">
                         Alias
                       </div>
-                      <div className="text-[11px] text-zinc-600">{peerAlias(u)}</div>
+                      <div className="text-[11px] text-zinc-600">
+                        {peerAlias(u)}
+                      </div>
                     </AdminTableCell>
-                    <AdminTableCell density="comfortable" className="text-zinc-800 font-medium">
+                    <AdminTableCell
+                      density="comfortable"
+                      className="text-zinc-800 font-medium"
+                    >
                       {roleLabel(u.role)}
                     </AdminTableCell>
                     <AdminTableCell density="comfortable">
@@ -417,7 +454,10 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
                         </span>
                       )}
                     </AdminTableCell>
-                    <AdminTableCell density="comfortable" className="text-right">
+                    <AdminTableCell
+                      density="comfortable"
+                      className="text-right"
+                    >
                       <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-[11px] font-bold uppercase tracking-wide">
                         {showResetFor(u) ? (
                           <button
@@ -493,15 +533,20 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
               Create user
             </h3>
             <p className="text-xs text-zinc-500 mb-6">
-              Assign a <strong className="font-semibold text-zinc-700">User ID</strong> they will type at login (with tenant code).
-              Optionally set a peer-facing alias; otherwise peers see that User ID. Invite code and temp password are returned once.
+              Assign a{" "}
+              <strong className="font-semibold text-zinc-700">User ID</strong>{" "}
+              they will type at login (with tenant code). Optionally set a
+              peer-facing alias; otherwise peers see that User ID. Invite code
+              and temp password are returned once.
             </p>
 
             {createUserResult ? (
               <div className="space-y-4">
                 <p className="text-sm text-zinc-700">
                   User ID{" "}
-                  <span className="font-semibold">{createUserResult.username}</span>{" "}
+                  <span className="font-semibold">
+                    {createUserResult.username}
+                  </span>{" "}
                   created. Copy the details below; they will not be shown again.
                 </p>
                 <div className="rounded-sm border border-zinc-200 bg-zinc-50 p-3 font-mono text-xs break-all space-y-2">
@@ -515,7 +560,9 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
                   </div>
                   <div className="text-[10px] text-zinc-500">
                     Expires{" "}
-                    {new Date(createUserResult.inviteExpiresAt).toLocaleString()}
+                    {new Date(
+                      createUserResult.inviteExpiresAt,
+                    ).toLocaleString()}
                   </div>
                   {createUserResult.temporaryPassword ? (
                     <div className="pt-2 border-t border-zinc-200">
@@ -565,7 +612,8 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
                     Peer-facing alias
                   </label>
                   <p className="text-[11px] text-zinc-500 mb-1.5">
-                    Optional. Leave blank and peers see their User ID until you set a custom alias.
+                    Optional. Leave blank and peers see their User ID until you
+                    set a custom alias.
                   </p>
                   <input
                     value={newUser.publicAlias}
@@ -631,9 +679,13 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
             </h3>
             <p className="text-sm text-zinc-600 mb-6">
               Issue a temporary password for alias{" "}
-              <span className="font-semibold text-zinc-900">{peerAlias(resetTarget)}</span>
-              {" "}(User ID{" "}
-              <span className="font-mono font-semibold text-zinc-900">{resetTarget.username}</span>
+              <span className="font-semibold text-zinc-900">
+                {peerAlias(resetTarget)}
+              </span>{" "}
+              (User ID{" "}
+              <span className="font-mono font-semibold text-zinc-900">
+                {resetTarget.username}
+              </span>
               ). This action is recorded in the audit log.
             </p>
             {resetError ? (
@@ -703,9 +755,13 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
             </h3>
             <p className="text-sm text-zinc-600 mb-6">
               Permanently delete alias{" "}
-              <span className="font-semibold text-zinc-900">{peerAlias(deleteTarget)}</span>
-              {" "}(User ID{" "}
-              <span className="font-mono font-semibold text-zinc-900">{deleteTarget.username}</span>
+              <span className="font-semibold text-zinc-900">
+                {peerAlias(deleteTarget)}
+              </span>{" "}
+              (User ID{" "}
+              <span className="font-mono font-semibold text-zinc-900">
+                {deleteTarget.username}
+              </span>
               ). This cannot be undone.
             </p>
             {deleteError ? (
@@ -746,8 +802,9 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
               Edit User ID
             </h3>
             <p className="text-xs text-zinc-500 mb-4">
-              Must stay unique within your tenant. People sign in with tenant code plus this User ID.
-              If the account is already linked for sign-in, the backing email is updated to match.
+              Must stay unique within your tenant. People sign in with tenant
+              code plus this User ID. If the account is already linked for
+              sign-in, the backing email is updated to match.
             </p>
             {userIdError ? (
               <p className="text-sm text-red-600 mb-4">{userIdError}</p>
@@ -801,8 +858,10 @@ export default function UsersPageClient({ initialMe, initialUsers }: Props) {
             </h3>
             <p className="text-xs text-zinc-500 mb-4">
               User ID{" "}
-              <span className="font-mono font-semibold text-zinc-800">{aliasTarget.username}</span>
-              {" "}does not change. Other agents see the alias below.
+              <span className="font-mono font-semibold text-zinc-800">
+                {aliasTarget.username}
+              </span>{" "}
+              does not change. Other agents see the alias below.
             </p>
             {aliasError ? (
               <p className="text-sm text-red-600 mb-4">{aliasError}</p>

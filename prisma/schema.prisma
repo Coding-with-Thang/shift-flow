@@ -31,6 +31,12 @@ enum TicketStatus {
   EXPIRED
 }
 
+/// Ticket purpose: giveaway listed in marketplace vs request routed to leaders/ops
+enum ShiftTicketKind {
+  GIVEAWAY
+  REQUEST
+}
+
 /// Distinct actions for compliance / reporting
 enum AuditAction {
   TICKET_CREATED
@@ -127,6 +133,7 @@ model ShiftTicket {
   endSlot       Int
   siteTeam      String?
   skillTag      String?
+  kind          ShiftTicketKind @default(GIVEAWAY)
   status        TicketStatus  @default(PENDING)
   claimerId     String?
   claimer       User?         @relation("Claimer", fields: [claimerId], references: [id], onDelete: SetNull)

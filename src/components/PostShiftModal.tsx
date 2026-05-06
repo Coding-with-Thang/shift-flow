@@ -10,12 +10,14 @@ interface PostShiftModalProps {
   onClose: () => void;
   /** Called after the ticket is persisted */
   onSuccess?: () => void;
+  kind?: "GIVEAWAY" | "REQUEST";
 }
 
 export function PostShiftModal({
   isOpen,
   onClose,
   onSuccess,
+  kind = "GIVEAWAY",
 }: PostShiftModalProps) {
   const [role, setRole] = useState("Calls");
   const [date, setDate] = useState("");
@@ -45,9 +47,21 @@ export function PostShiftModal({
 
   if (!isOpen) return null;
 
+  const isQuarterHourTime = (time: string) => {
+    const parts = time.split(":");
+    if (parts.length !== 2) return false;
+    const minutes = Number(parts[1]);
+    return Number.isFinite(minutes) && minutes % 15 === 0;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setValidationError(null);
+
+    if (!isQuarterHourTime(startTime) || !isQuarterHourTime(endTime)) {
+      setValidationError("Start/end time must be in 15-minute intervals.");
+      return;
+    }
 
     const start = timeToSlot(startTime);
     const end = timeToSlot(endTime);
@@ -80,17 +94,24 @@ export function PostShiftModal({
         startSlot: start,
         endSlot: end,
         skillTag: role,
+        kind,
       });
       onSuccess?.();
       onClose();
     } catch (err) {
       setValidationError(
-        err instanceof Error ? err.message : "Failed to post shift",
+        err instanceof Error
+          ? err.message
+          : kind === "REQUEST"
+            ? "Failed to request hours"
+            : "Failed to post shift",
       );
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const isRequest = kind === "REQUEST";
 
   return (
     <div className="fixed inset-0 z-100 flex items-center justify-center bg-zinc-900/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -99,10 +120,10 @@ export function PostShiftModal({
         <div className="flex justify-between items-center px-8 py-6 border-b border-zinc-100">
           <div>
             <h2 className="text-[20px] font-bold tracking-tight text-black flex items-center gap-2">
-              POST NEW SHIFT
+              {isRequest ? "REQUEST HOURS" : "POST NEW SHIFT"}
             </h2>
             <p className="text-[11px] text-zinc-500 font-medium tracking-wider uppercase mt-1">
-              Marketplace Listing Entry
+              {isRequest ? "Coverage Request Ticket" : "Marketplace Listing Entry"}
             </p>
           </div>
           <button
@@ -166,6 +187,7 @@ export function PostShiftModal({
                 <input
                   type="time"
                   required
+                  step={900}
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
                   className="w-full border border-zinc-200 px-4 py-3 text-sm focus:outline-none focus:border-black transition-colors bg-[#FAFAFA]"
@@ -179,6 +201,7 @@ export function PostShiftModal({
                 <input
                   type="time"
                   required
+                  step={900}
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
                   className="w-full border border-zinc-200 px-4 py-3 text-sm focus:outline-none focus:border-black transition-colors bg-[#FAFAFA]"
@@ -210,8 +233,9 @@ export function PostShiftModal({
               <div className="bg-zinc-50 border border-zinc-100 p-4 flex gap-3">
                 <Info className="w-4 h-4 text-zinc-400 mt-0.5 shrink-0" />
                 <p className="text-[11px] leading-relaxed text-zinc-500 italic">
-                  Posted shifts are visible to all eligible agents in the
-                  marketplace immediately after submission.
+                  {isRequest
+                    ? "Hour requests are routed to leaders/ops for review."
+                    : "Posted shifts are visible to all eligible agents in the marketplace immediately after submission."}
                 </p>
               </div>
             )}
@@ -231,7 +255,13 @@ export function PostShiftModal({
               disabled={isSubmitting}
               className="flex-2 bg-black text-white py-4 text-[11px] font-bold tracking-[0.2em] hover:bg-zinc-800 transition-all uppercase disabled:opacity-60 disabled:pointer-events-none"
             >
-              {isSubmitting ? "Posting…" : "Confirm & Post Shift"}
+              {isSubmitting
+                ? isRequest
+                  ? "Submitting…"
+                  : "Posting…"
+                : isRequest
+                  ? "Confirm & Request Hours"
+                  : "Confirm & Post Shift"}
             </button>
           </div>
         </form>

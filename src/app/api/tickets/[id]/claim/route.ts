@@ -23,6 +23,7 @@ export async function POST(_req: Request, ctx: Params) {
       });
       if (!t) throw new Error("NOT_FOUND");
       if (t.requestorId === session.sub) throw new Error("SELF");
+      if (t.kind !== "GIVEAWAY") throw new Error("NOT_CLAIMABLE");
       if (t.status !== "PENDING") throw new Error("NOT_OPEN");
 
       const row = await tx.shiftTicket.updateMany({
@@ -62,6 +63,8 @@ export async function POST(_req: Request, ctx: Params) {
     const msg = e instanceof Error ? e.message : "";
     if (msg === "NOT_FOUND") return NextResponse.json({ error: "Not found" }, { status: 404 });
     if (msg === "SELF") return NextResponse.json({ error: "Cannot claim your own ticket" }, { status: 400 });
+    if (msg === "NOT_CLAIMABLE")
+      return NextResponse.json({ error: "This ticket cannot be claimed" }, { status: 400 });
     if (msg === "NOT_OPEN" || msg === "RACE")
       return NextResponse.json({ error: "Ticket no longer available" }, { status: 409 });
     throw e;
