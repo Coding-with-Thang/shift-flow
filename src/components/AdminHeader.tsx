@@ -78,7 +78,7 @@ export function AdminHeader({ onPostShiftClick }: AdminHeaderProps) {
     <>
       <header className="h-[72px] bg-white border-b border-[#E2E8F0] px-8 flex items-center justify-between sticky top-0 z-20">
         <div className="flex items-center gap-3 min-w-0">
-          <Link href="/admin" className="shrink-0">
+          <Link href="/marketplace" className="shrink-0">
             <span className="font-black text-xl tracking-tighter uppercase hover:opacity-80 transition-opacity">
               Shiftflow
             </span>

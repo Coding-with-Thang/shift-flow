@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Shift swap",
+  title: "ShiftFlow",
   description: "BPO shift tickets: post hours, claim, approve. No email login.",
 };
 
