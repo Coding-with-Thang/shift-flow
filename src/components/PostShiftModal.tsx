@@ -10,6 +10,7 @@ interface PostShiftModalProps {
   onClose: () => void;
   /** Called after the ticket is persisted */
   onSuccess?: () => void;
+  /** Optional initial kind (user can still change in-modal). */
   kind?: "GIVEAWAY" | "REQUEST";
 }
 
@@ -19,6 +20,7 @@ export function PostShiftModal({
   onSuccess,
   kind = "GIVEAWAY",
 }: PostShiftModalProps) {
+  const [ticketKind, setTicketKind] = useState<"GIVEAWAY" | "REQUEST">(kind);
   const [role, setRole] = useState("Calls");
   const [date, setDate] = useState("");
   const [startTime, setStartTime] = useState("08:00");
@@ -29,6 +31,10 @@ export function PostShiftModal({
   } | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) setTicketKind(kind);
+  }, [isOpen, kind]);
 
   useEffect(() => {
     if (isOpen) {
@@ -94,7 +100,7 @@ export function PostShiftModal({
         startSlot: start,
         endSlot: end,
         skillTag: role,
-        kind,
+        kind: ticketKind,
       });
       onSuccess?.();
       onClose();
@@ -102,7 +108,7 @@ export function PostShiftModal({
       setValidationError(
         err instanceof Error
           ? err.message
-          : kind === "REQUEST"
+          : ticketKind === "REQUEST"
             ? "Failed to request hours"
             : "Failed to post shift",
       );
@@ -111,7 +117,28 @@ export function PostShiftModal({
     }
   };
 
-  const isRequest = kind === "REQUEST";
+  const isRequest = ticketKind === "REQUEST";
+
+  const pad2 = (n: number) => n.toString().padStart(2, "0");
+  const parseTimeParts = (time: string): { hour12: number; minute: 0 | 15 | 30 | 45; period: "AM" | "PM" } => {
+    const [hStr, mStr] = time.split(":");
+    const h = Number(hStr);
+    const m = Number(mStr);
+    const hour24 = Number.isFinite(h) ? h : 0;
+    const minute = ([0, 15, 30, 45].includes(m) ? m : 0) as 0 | 15 | 30 | 45;
+    const period: "AM" | "PM" = hour24 >= 12 ? "PM" : "AM";
+    const hour12 = ((hour24 % 12) || 12) as number;
+    return { hour12, minute, period };
+  };
+
+  const toTimeString = (hour12: number, minute: 0 | 15 | 30 | 45, period: "AM" | "PM") => {
+    const base = hour12 % 12;
+    const hour24 = period === "PM" ? base + 12 : base;
+    return `${pad2(hour24)}:${pad2(minute)}`;
+  };
+
+  const startParts = parseTimeParts(startTime);
+  const endParts = parseTimeParts(endTime);
 
   return (
     <div className="fixed inset-0 z-100 flex items-center justify-center bg-zinc-900/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -136,6 +163,33 @@ export function PostShiftModal({
 
         <form onSubmit={handleSubmit} className="flex flex-col">
           <div className="px-8 py-8 flex flex-col gap-6">
+            {/* Ticket Kind */}
+            <div className="flex flex-col gap-2.5">
+              <label className="text-[11px] font-bold text-zinc-900 tracking-widest uppercase flex items-center gap-2">
+                <Info className="w-3.5 h-3.5" />
+                What are you posting?
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { k: "GIVEAWAY" as const, label: "Giving hours away" },
+                  { k: "REQUEST" as const, label: "Requesting hours" },
+                ].map((row) => (
+                  <button
+                    key={row.k}
+                    type="button"
+                    onClick={() => setTicketKind(row.k)}
+                    className={`px-4 py-2.5 text-[12px] font-bold border transition-all ${
+                      ticketKind === row.k
+                        ? "bg-black text-white border-black"
+                        : "bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400"
+                    }`}
+                  >
+                    {row.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Role Selection */}
             <div className="flex flex-col gap-2.5">
               <label className="text-[11px] font-bold text-zinc-900 tracking-widest uppercase flex items-center gap-2">
@@ -184,28 +238,130 @@ export function PostShiftModal({
                   <Clock className="w-3.5 h-3.5" />
                   Start Time
                 </label>
-                <input
-                  type="time"
-                  required
-                  step={900}
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  className="w-full border border-zinc-200 px-4 py-3 text-sm focus:outline-none focus:border-black transition-colors bg-[#FAFAFA]"
-                />
+                <div className="grid grid-cols-3 gap-2">
+                  <select
+                    aria-label="Start hour"
+                    value={startParts.hour12}
+                    onChange={(e) =>
+                      setStartTime(
+                        toTimeString(
+                          Number(e.target.value),
+                          startParts.minute,
+                          startParts.period,
+                        ),
+                      )
+                    }
+                    className="w-full border border-zinc-200 px-3 py-3 text-sm focus:outline-none focus:border-black transition-colors bg-[#FAFAFA]"
+                  >
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
+                      <option key={h} value={h}>
+                        {h}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    aria-label="Start minutes"
+                    value={startParts.minute}
+                    onChange={(e) =>
+                      setStartTime(
+                        toTimeString(
+                          startParts.hour12,
+                          Number(e.target.value) as 0 | 15 | 30 | 45,
+                          startParts.period,
+                        ),
+                      )
+                    }
+                    className="w-full border border-zinc-200 px-3 py-3 text-sm focus:outline-none focus:border-black transition-colors bg-[#FAFAFA]"
+                  >
+                    {[0, 15, 30, 45].map((m) => (
+                      <option key={m} value={m}>
+                        {pad2(m)}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    aria-label="Start period"
+                    value={startParts.period}
+                    onChange={(e) =>
+                      setStartTime(
+                        toTimeString(
+                          startParts.hour12,
+                          startParts.minute,
+                          e.target.value as "AM" | "PM",
+                        ),
+                      )
+                    }
+                    className="w-full border border-zinc-200 px-3 py-3 text-sm focus:outline-none focus:border-black transition-colors bg-[#FAFAFA]"
+                  >
+                    <option value="AM">AM</option>
+                    <option value="PM">PM</option>
+                  </select>
+                </div>
               </div>
               <div className="flex flex-col gap-2.5">
                 <label className="text-[11px] font-bold text-zinc-900 tracking-widest uppercase flex items-center gap-2">
                   <Clock className="w-3.5 h-3.5" />
                   End Time
                 </label>
-                <input
-                  type="time"
-                  required
-                  step={900}
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  className="w-full border border-zinc-200 px-4 py-3 text-sm focus:outline-none focus:border-black transition-colors bg-[#FAFAFA]"
-                />
+                <div className="grid grid-cols-3 gap-2">
+                  <select
+                    aria-label="End hour"
+                    value={endParts.hour12}
+                    onChange={(e) =>
+                      setEndTime(
+                        toTimeString(
+                          Number(e.target.value),
+                          endParts.minute,
+                          endParts.period,
+                        ),
+                      )
+                    }
+                    className="w-full border border-zinc-200 px-3 py-3 text-sm focus:outline-none focus:border-black transition-colors bg-[#FAFAFA]"
+                  >
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
+                      <option key={h} value={h}>
+                        {h}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    aria-label="End minutes"
+                    value={endParts.minute}
+                    onChange={(e) =>
+                      setEndTime(
+                        toTimeString(
+                          endParts.hour12,
+                          Number(e.target.value) as 0 | 15 | 30 | 45,
+                          endParts.period,
+                        ),
+                      )
+                    }
+                    className="w-full border border-zinc-200 px-3 py-3 text-sm focus:outline-none focus:border-black transition-colors bg-[#FAFAFA]"
+                  >
+                    {[0, 15, 30, 45].map((m) => (
+                      <option key={m} value={m}>
+                        {pad2(m)}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    aria-label="End period"
+                    value={endParts.period}
+                    onChange={(e) =>
+                      setEndTime(
+                        toTimeString(
+                          endParts.hour12,
+                          endParts.minute,
+                          e.target.value as "AM" | "PM",
+                        ),
+                      )
+                    }
+                    className="w-full border border-zinc-200 px-3 py-3 text-sm focus:outline-none focus:border-black transition-colors bg-[#FAFAFA]"
+                  >
+                    <option value="AM">AM</option>
+                    <option value="PM">PM</option>
+                  </select>
+                </div>
               </div>
             </div>
 

@@ -108,12 +108,12 @@ export async function GET(req: Request) {
   if (view === "dashboard") {
     const [available, mine, claimed] = await Promise.all([
       prisma.shiftTicket.findMany({
-        where: { ...tenantFilter, kind: "GIVEAWAY", status: "PENDING" },
+        where: { ...tenantFilter, status: "PENDING", kind: { in: ["GIVEAWAY", "REQUEST"] } },
         orderBy: [{ shiftDate: "asc" }, { startSlot: "asc" }],
         include: baseInclude,
       }),
       prisma.shiftTicket.findMany({
-        where: { ...tenantFilter, requestorId: session.sub, kind: "GIVEAWAY" },
+        where: { ...tenantFilter, requestorId: session.sub, kind: { in: ["GIVEAWAY", "REQUEST"] } },
         orderBy: { shiftDate: "desc" },
         include: baseInclude,
       }),

@@ -44,6 +44,7 @@ type ShiftData = {
   poster: string;
   eligible: boolean;
   isMine: boolean;
+  kind: "GIVEAWAY" | "REQUEST";
   date: Date;
   skills: string[];
   createdAt: Date;
@@ -76,6 +77,7 @@ function ticketToShiftData(t: PublicTicketJson): ShiftData {
     poster: t.requestorAlias,
     eligible: !isMine,
     isMine,
+    kind: t.kind,
     date: new Date(`${t.shiftDate}T12:00:00.000Z`),
     skills: [],
     createdAt: new Date(t.createdAt),
@@ -380,6 +382,9 @@ export default function DashboardPage() {
                 Role
               </th>
               <th className="px-6 py-4 font-bold text-xs text-zinc-500 border-b border-zinc-200 uppercase tracking-widest">
+                Type
+              </th>
+              <th className="px-6 py-4 font-bold text-xs text-zinc-500 border-b border-zinc-200 uppercase tracking-widest">
                 Poster
               </th>
               <th className="px-6 py-4 font-bold text-xs text-zinc-500 border-b border-zinc-200 uppercase tracking-widest text-right">
@@ -411,6 +416,17 @@ export default function DashboardPage() {
                   )}
                   {shift.role}
                 </td>
+                <td className="px-6 py-5">
+                  {shift.kind === "REQUEST" ? (
+                    <span className="text-[10px] font-bold tracking-widest uppercase border border-sky-200 bg-sky-50 text-sky-800 px-3 py-1.5 rounded-sm whitespace-nowrap">
+                      Requesting hours
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold tracking-widest uppercase border border-zinc-200 bg-white text-zinc-800 px-3 py-1.5 rounded-sm whitespace-nowrap">
+                      Giving hours
+                    </span>
+                  )}
+                </td>
                 <td className="px-6 py-5 text-sm italic text-zinc-500">
                   {shift.isMine ? "You" : shift.poster}
                 </td>
@@ -432,6 +448,10 @@ export default function DashboardPage() {
                     !roleLoaded ? (
                       <span className="text-[10px] font-bold text-zinc-300 tracking-widest">
                         …
+                      </span>
+                    ) : shift.kind === "REQUEST" ? (
+                      <span className="text-[10px] font-bold text-zinc-400 tracking-widest uppercase">
+                        View only
                       </span>
                     ) : canClaim ? (
                       <button
@@ -510,23 +530,23 @@ export default function DashboardPage() {
             <section className="mb-16">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-lg font-bold text-zinc-900 tracking-tight">
-                  Available Shifts
+                  Marketplace tickets
                 </h2>
               </div>
               {renderTable(
                 filteredAvailable,
-                "No shifts available matching these criteria.",
+                "No tickets available matching these criteria.",
               )}
             </section>
 
             {/* My Listings */}
             <section className="mb-16">
               <h2 className="text-lg font-bold text-zinc-900 tracking-tight mb-6">
-                Shifts I&apos;m Giving Away
+                My tickets
               </h2>
               {renderTable(
                 myListings,
-                "You haven't posted any shifts for giveaway.",
+                "You haven't posted any tickets yet.",
               )}
             </section>
 
