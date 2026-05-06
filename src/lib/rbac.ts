@@ -95,3 +95,16 @@ export function canEditLeaderAlias(actor: Role, target: Role): boolean {
 export function canEditOwnAlias(role: Role): boolean {
   return role === "LEADER" || role === "OPS_MANAGER" || role === "SUPER_ADMIN";
 }
+
+/**
+ * Change login User ID (`User.username`), unique per tenant.
+ *
+ * - Editing someone else: same scope as {@link canDeleteUser} (who you may manage).
+ * - Editing yourself: only operations managers and super admins (leaders cannot rename their own User ID).
+ */
+export function canEditUserUsername(actor: Role, target: Role, isSelf: boolean): boolean {
+  if (isSelf) {
+    return actor === "OPS_MANAGER" || actor === "SUPER_ADMIN";
+  }
+  return canDeleteUser(actor, target);
+}

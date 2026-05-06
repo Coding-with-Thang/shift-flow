@@ -57,6 +57,15 @@ export async function setAuthUserPassword(admin: SupabaseClient, authUserId: str
   if (error) throw error;
 }
 
+/** Updates synthetic login email when `User.username` changes (tenant-scoped sign-in). */
+export async function updateAuthUserEmail(admin: SupabaseClient, authUserId: string, email: string) {
+  const { error } = await admin.auth.admin.updateUserById(authUserId, {
+    email,
+    email_confirm: true,
+  });
+  if (error) throw error;
+}
+
 export async function deleteAuthUser(admin: SupabaseClient, authUserId: string) {
   const { error } = await admin.auth.admin.deleteUser(authUserId);
   if (error) throw error;

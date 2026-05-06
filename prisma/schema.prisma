@@ -42,6 +42,7 @@ enum AuditAction {
   USER_CREATED
   USER_DELETED
   USER_ALIAS_UPDATED
+  USER_USERNAME_UPDATED
   INVITE_ISSUED
   LOGIN_SUCCESS
   LOGOUT
@@ -78,8 +79,8 @@ model User {
   /// Legacy bcrypt hash; unused when `authUserId` is set (password lives in Supabase Auth).
   passwordHash String?
   role         Role
-  /// Peer-facing alias (especially agents); leaders/ops use username + alias for back-office.
-  publicAlias  String
+  /// Optional peer-facing alias; if unset, peers see login User ID (`username`).
+  publicAlias  String?
   status       UserStatus @default(ACTIVE)
   /// True when the user must set their own password (e.g. initial temp password for non–super-admin accounts).
   mustChangePassword Boolean @default(false)

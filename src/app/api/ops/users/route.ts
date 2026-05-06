@@ -15,7 +15,8 @@ import { listUsersForTenant } from "@/lib/ops/user-directory";
 
 const createSchema = z.object({
   username: z.string().min(2).max(64),
-  publicAlias: z.string().min(1).max(64),
+  /** Omit or empty → peers see User ID (`username`) until a custom alias is set. */
+  publicAlias: z.string().max(64).optional(),
   role: z.enum(["AGENT", "LEADER", "OPS_MANAGER", "SUPER_ADMIN"]),
   /** Required when the creator is SUPER_ADMIN (which tenant to attach the user to). */
   tenantId: z.string().min(1).optional(),
@@ -50,7 +51,9 @@ export async function POST(req: Request) {
   const parsed = createSchema.safeParse(json);
   if (!parsed.success) return NextResponse.json({ error: "Invalid body" }, { status: 400 });
 
-  const { username, publicAlias, role, password, tenantId: bodyTenantId } = parsed.data;
+  const { username, publicAlias: aliasRaw, role, password, tenantId: bodyTenantId } = parsed.data;
+  const aliasTrimmed = aliasRaw?.trim() ?? "";
+  const publicAlias = aliasTrimmed.length > 0 ? aliasTrimmed : null;
   const targetRole = role as Role;
 
   let passwordToUse = password;

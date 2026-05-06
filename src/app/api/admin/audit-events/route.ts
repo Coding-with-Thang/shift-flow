@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { requireSession } from "@/lib/auth/session";
 import { canViewAnalytics } from "@/lib/rbac";
 import { resolveTenantListScope } from "@/lib/tenant-scope";
+import { peerAlias } from "@/lib/user-display";
 
 const AUDIT_ACTIONS = new Set<string>(Object.values(AuditAction));
 const MAX_TAKE = 100;
@@ -161,7 +162,7 @@ export async function GET(req: Request) {
       entityType: e.entityType,
       entityId: e.entityId,
       actorUsername: e.actor.username,
-      actorAlias: e.actor.publicAlias,
+      actorAlias: peerAlias(e.actor),
       actorRole: e.actor.role,
       payload: includePayload ? (e as { payload: unknown }).payload : null,
     })),

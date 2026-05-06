@@ -5,8 +5,8 @@ import { serializeTicketPublic } from "@/lib/tickets/serialize";
 import { resolveTenantListScope } from "@/lib/tenant-scope";
 
 const baseInclude = {
-  requestor: { select: { id: true, publicAlias: true } },
-  claimer: { select: { id: true, publicAlias: true } },
+  requestor: { select: { id: true, publicAlias: true, username: true } },
+  claimer: { select: { id: true, publicAlias: true, username: true } },
   tenant: { select: { tenantCode: true, name: true } },
 } as const;
 

@@ -26,8 +26,8 @@ export async function GET(req: Request) {
   if ("error" in scope) return scope.error;
 
   const baseInclude = {
-    requestor: { select: { id: true, publicAlias: true } },
-    claimer: { select: { id: true, publicAlias: true } },
+    requestor: { select: { id: true, publicAlias: true, username: true } },
+    claimer: { select: { id: true, publicAlias: true, username: true } },
     tenant: { select: { tenantCode: true, name: true } },
   } as const;
 
@@ -164,8 +164,8 @@ export async function POST(req: Request) {
       status: "PENDING",
     },
     include: {
-      requestor: { select: { id: true, publicAlias: true } },
-      claimer: { select: { id: true, publicAlias: true } },
+      requestor: { select: { id: true, publicAlias: true, username: true } },
+      claimer: { select: { id: true, publicAlias: true, username: true } },
       tenant: { select: { tenantCode: true, name: true } },
     },
   });

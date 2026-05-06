@@ -1,8 +1,9 @@
 import type { ShiftTicket, User } from "@prisma/client";
+import { peerAlias } from "@/lib/user-display";
 
 type TicketWithUsers = ShiftTicket & {
-  requestor: Pick<User, "id" | "publicAlias">;
-  claimer: Pick<User, "id" | "publicAlias"> | null;
+  requestor: Pick<User, "id" | "publicAlias" | "username">;
+  claimer: Pick<User, "id" | "publicAlias" | "username"> | null;
   tenant?: { tenantCode: string; name: string };
 };
 
@@ -16,8 +17,8 @@ export function serializeTicketPublic(t: TicketWithUsers) {
     siteTeam: t.siteTeam,
     skillTag: t.skillTag,
     status: t.status,
-    requestorAlias: t.requestor.publicAlias,
-    claimerAlias: t.claimer?.publicAlias ?? null,
+    requestorAlias: peerAlias(t.requestor),
+    claimerAlias: t.claimer ? peerAlias(t.claimer) : null,
     tenantCode: t.tenant?.tenantCode,
     tenantName: t.tenant?.name,
     createdAt: t.createdAt.toISOString(),

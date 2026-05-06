@@ -1,4 +1,5 @@
-import type { AuditAction } from "@prisma/client";
+import type { AuditAction, User } from "@prisma/client";
+import { peerAlias } from "@/lib/user-display";
 
 /** Actions shown in the per-user marketplace notification feed. */
 export const NOTIFICATION_FEED_ACTIONS: AuditAction[] = [
@@ -19,8 +20,8 @@ export const ADMIN_SHIFT_ACTIVITY_ACTIONS: AuditAction[] = [
 ];
 
 export type TicketAliasSlice = {
-  requestor: { publicAlias: string };
-  claimer: { publicAlias: string } | null;
+  requestor: Pick<User, "publicAlias" | "username">;
+  claimer: Pick<User, "publicAlias" | "username"> | null;
   decisionNotes: string | null;
 };
 
@@ -42,8 +43,8 @@ export function actionToNotificationBadge(action: AuditAction): NotificationActi
 }
 
 export function buildTicketAuditSummary(action: AuditAction, ticket: TicketAliasSlice): string {
-  const req = ticket.requestor.publicAlias;
-  const cl = ticket.claimer?.publicAlias;
+  const req = peerAlias(ticket.requestor);
+  const cl = ticket.claimer ? peerAlias(ticket.claimer) : null;
 
   switch (action) {
     case "TICKET_CREATED":

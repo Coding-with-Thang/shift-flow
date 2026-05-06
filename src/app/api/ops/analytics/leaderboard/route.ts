@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/auth/session";
 import { canViewAnalytics } from "@/lib/rbac";
 import { resolveTenantListScope } from "@/lib/tenant-scope";
 import { getWindowRange, parseWindow } from "@/lib/analytics/window";
+import { peerAlias } from "@/lib/user-display";
 
 const VALID_ROLES = ["requestor", "claimer", "approver"] as const;
 type LeaderboardRole = (typeof VALID_ROLES)[number];
@@ -119,7 +120,7 @@ export async function GET(req: Request) {
     const u = userMap.get(r.userId);
     return {
       userId: r.userId,
-      alias: u?.publicAlias ?? "Unknown",
+      alias: u ? peerAlias(u) : "Unknown",
       username: u?.username ?? "unknown",
       role: u?.role ?? "AGENT",
       total: r.total,

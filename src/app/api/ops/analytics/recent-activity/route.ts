@@ -7,6 +7,7 @@ import {
   ADMIN_SHIFT_ACTIVITY_ACTIONS,
   buildTicketAuditSummary,
 } from "@/lib/tickets/activity-feed";
+import { peerAlias } from "@/lib/user-display";
 
 export async function GET(req: Request) {
   const session = await requireSession().catch(() => null);
@@ -38,8 +39,8 @@ export async function GET(req: Request) {
       actor: { select: { publicAlias: true, username: true } },
       shiftTicket: {
         include: {
-          requestor: { select: { publicAlias: true } },
-          claimer: { select: { publicAlias: true } },
+          requestor: { select: { publicAlias: true, username: true } },
+          claimer: { select: { publicAlias: true, username: true } },
         },
       },
     },
@@ -54,7 +55,7 @@ export async function GET(req: Request) {
       ticketId: r.shiftTicket.id,
       action: r.action,
       createdAt: r.createdAt.toISOString(),
-      actorAlias: r.actor.publicAlias,
+      actorAlias: peerAlias(r.actor),
       actorUsername: r.actor.username,
       summary: buildTicketAuditSummary(r.action, r.shiftTicket),
       ticketStatus: r.shiftTicket.status,

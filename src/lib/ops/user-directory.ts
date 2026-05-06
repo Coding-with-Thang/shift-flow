@@ -1,11 +1,11 @@
 import type { Role, UserStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
-/** Tenant directory row: `username` is the login User ID; `publicAlias` is peer-facing (especially for agents). */
+/** Tenant directory row: `username` is login User ID; `publicAlias` overrides peer display when set. */
 export type DirectoryUser = {
   id: string;
   username: string;
-  publicAlias: string;
+  publicAlias: string | null;
   role: Role;
   status: UserStatus;
 };

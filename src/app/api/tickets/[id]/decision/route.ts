@@ -48,8 +48,8 @@ export async function POST(req: Request, ctx: Params) {
       decidedAt: new Date(),
     },
     include: {
-      requestor: { select: { id: true, publicAlias: true } },
-      claimer: { select: { id: true, publicAlias: true } },
+      requestor: { select: { id: true, publicAlias: true, username: true } },
+      claimer: { select: { id: true, publicAlias: true, username: true } },
       tenant: { select: { tenantCode: true, name: true } },
     },
   });

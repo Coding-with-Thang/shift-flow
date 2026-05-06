@@ -78,8 +78,8 @@ export async function GET(req: Request) {
     include: {
       shiftTicket: {
         include: {
-          requestor: { select: { publicAlias: true } },
-          claimer: { select: { publicAlias: true } },
+          requestor: { select: { publicAlias: true, username: true } },
+          claimer: { select: { publicAlias: true, username: true } },
         },
       },
     },

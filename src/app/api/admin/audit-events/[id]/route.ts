@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireSession } from "@/lib/auth/session";
 import { canViewAnalytics } from "@/lib/rbac";
 import { resolveTenantListScope } from "@/lib/tenant-scope";
+import { peerAlias } from "@/lib/user-display";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -53,7 +54,7 @@ export async function GET(req: Request, ctx: Params) {
       entityType: row.entityType,
       entityId: row.entityId,
       actorUsername: row.actor.username,
-      actorAlias: row.actor.publicAlias,
+      actorAlias: peerAlias(row.actor),
       actorRole: row.actor.role,
       payload: row.payload,
     },
